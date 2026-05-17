@@ -97,7 +97,7 @@ export default function Home() {
           <h2 className="text-lg font-semibold">백테스트 파라미터</h2>
           <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <label className="flex flex-col gap-1 text-sm">
-              <span className="font-medium text-zinc-700">빠른 SMA</span>
+              <span className="font-medium text-zinc-700">Fast SMA</span>
               <input
                 type="number"
                 className="rounded-md border border-zinc-300 px-3 py-2"
@@ -108,7 +108,7 @@ export default function Home() {
               />
             </label>
             <label className="flex flex-col gap-1 text-sm">
-              <span className="font-medium text-zinc-700">느린 SMA</span>
+              <span className="font-medium text-zinc-700">Slow SMA</span>
               <input
                 type="number"
                 className="rounded-md border border-zinc-300 px-3 py-2"
