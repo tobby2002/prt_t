@@ -1,0 +1,25 @@
+[build-system]
+requires = ["hatchling>=1.18.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "prj-t-backend"
+version = "0.1.0"
+description = "FastAPI + Backtrader API for prj_t"
+requires-python = ">=3.9"
+dependencies = [
+    "backtrader>=1.9.78.123",
+    "fastapi>=0.128.8",
+    "pandas>=2.3.3",
+    "pydantic-settings>=2.11.0",
+    "uvicorn[standard]>=0.39.0",
+]
+
+[project.scripts]
+prj-t-api = "prj_t_backend.__main__:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/prj_t_backend"]
+
+[tool.uv]
+package = true
