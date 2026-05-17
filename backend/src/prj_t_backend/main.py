@@ -50,6 +50,10 @@ def create_app() -> FastAPI:
     def health() -> dict[str, str]:
         return {"status": "ok"}
 
+    @app.get("/api/bye")
+    def health() -> dict[str, str]:
+        return {"status": "good bye"}
+
     @app.post("/api/backtests/run", response_model=RunBacktestResponse)
     def run_backtest(body: RunBacktestRequest) -> RunBacktestResponse:
         try:
