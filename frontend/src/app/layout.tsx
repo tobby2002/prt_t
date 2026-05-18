@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "prj_t · Backtrader",
-  description: "Backtrader 백테스트 결과 뷰어",
+  description: "Backtrader 백테스트 결과 뷰어2",
 };
 
 export default function RootLayout({
