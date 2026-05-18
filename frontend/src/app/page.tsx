@@ -120,30 +120,7 @@ export default function Home() {
           </div>
           <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <label className="flex flex-col gap-1 text-sm">
-              <div className="flex items-center gap-1.5">
-                <span className="font-medium text-zinc-700">빠른 SMA</span>
-                <div className="relative flex items-center group cursor-help">
-                  <svg
-                    className="h-3.5 w-3.5 text-zinc-400 transition-colors group-hover:text-zinc-600"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                  </svg>
-                  <div className="absolute left-1/2 bottom-full mb-2 hidden w-56 -translate-x-1/2 flex-col items-center group-hover:flex z-50">
-                    <div className="rounded-lg bg-zinc-800 px-3 py-2 text-xs leading-relaxed text-white shadow-lg text-center font-normal">
-                      단기 가격 추세를 파악하기 위한 이동평균 기간입니다. (예: 10일)
-                    </div>
-                    <div className="-mt-1 h-2 w-2 rotate-45 bg-zinc-800"></div>
-                  </div>
-                </div>
-              </div>
+              <span className="font-medium text-zinc-700">Fast SMA</span>
               <input
                 type="number"
                 className="rounded-md border border-zinc-300 px-3 py-2"
@@ -154,7 +131,7 @@ export default function Home() {
               />
             </label>
             <label className="flex flex-col gap-1 text-sm">
-              <span className="font-medium text-zinc-700">느린 SMA</span>
+              <span className="font-medium text-zinc-700">Slow SMA</span>
               <input
                 type="number"
                 className="rounded-md border border-zinc-300 px-3 py-2"
