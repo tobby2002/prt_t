@@ -1,0 +1,15 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: FastAPI Debug (prj-t-api)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "prj_t_backend",
+            "cwd": "${workspaceFolder}/backend",
+            "python": "${workspaceFolder}/backend/.venv/Scripts/python.exe",
+            "console": "integratedTerminal",
+            "justMyCode": false
+        }
+    ]
+}
