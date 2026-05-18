@@ -22,7 +22,7 @@ class RunBacktestRequest(BaseModel):
     data_days: int = Field(400, ge=50, le=5000)
     seed: int = Field(42, ge=0)
 
-
+# tobby2002_1@gmail.com 백테스트 응답 데이터 구조
 class RunBacktestResponse(BaseModel):
     id: str
     summary: dict[str, Any]
