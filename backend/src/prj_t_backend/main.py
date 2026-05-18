@@ -13,7 +13,7 @@ from prj_t_backend.config import Settings, get_settings
 
 _store: dict[str, dict[str, Any]] = {}
 
-
+# tobby1-1 백테스트 요청 데이터 구조
 class RunBacktestRequest(BaseModel):
     fast: int = Field(10, ge=2, le=200)
     slow: int = Field(30, ge=3, le=500)
