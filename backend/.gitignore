@@ -1,0 +1,82 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+pytestdebug.log
+
+# Linters and Type Checkers
+.mypy_cache/
+.ruff_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+
+# Environments & Dependency Management
+.env
+.env.*
+!.env.example
+!.env.template
+.venv
+venv/
+ENV/
+env/
+env.bak/
+venv.bak/
+
+# Note: uv.lock is generally committed to git for reproducible builds.
+# If you want to ignore it, uncomment the line below:
+# uv.lock
+
+# Database
+*.sqlite3
+*.sqlite3-journal
+
+# Logs and Temporary Files
+*.log
+*.bak
+*.tmp
+*.temp
+
+# IDEs / Editors / OS
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db

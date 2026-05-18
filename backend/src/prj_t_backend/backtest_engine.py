@@ -8,7 +8,7 @@ import backtrader as bt
 import numpy as np
 import pandas as pd
 
-
+# 임의의 금융상품 시계열 데이터 생성
 def synthetic_ohlcv(days: int = 400, seed: int = 42) -> pd.DataFrame:
     rng = np.random.default_rng(seed)
     idx = pd.date_range("2023-01-01", periods=days, freq="D")
@@ -26,7 +26,7 @@ def synthetic_ohlcv(days: int = 400, seed: int = 42) -> pd.DataFrame:
         index=idx,
     )
 
-
+# 골든크로스 / 데드크로스 전략
 class SmaCross(bt.Strategy):
     params = (("fast", 10), ("slow", 30))
 
@@ -63,7 +63,7 @@ class SmaCross(bt.Strategy):
             }
         )
 
-
+# pandas 데이터 feed 구현
 class PandasOHLCV(bt.feeds.PandasData):
     params = (
         ("datetime", None),
@@ -75,7 +75,7 @@ class PandasOHLCV(bt.feeds.PandasData):
         ("openinterest", -1),
     )
 
-
+# 백테스트 실행 결과 데이터 구조
 @dataclass
 class BacktestRunResult:
     initial_cash: float
@@ -89,7 +89,7 @@ class BacktestRunResult:
     equity_curve: list[dict[str, Any]] = field(default_factory=list)
     trades: list[dict[str, Any]] = field(default_factory=list)
 
-
+# 안전하게 float 변환 함수
 def _safe_float(x: Any) -> float | None:
     if x is None:
         return None
@@ -101,7 +101,7 @@ def _safe_float(x: Any) -> float | None:
     except (TypeError, ValueError):
         return None
 
-
+# sma 교차 백테스트 실행 함수
 def run_sma_cross_backtest(
     *,
     fast: int = 10,

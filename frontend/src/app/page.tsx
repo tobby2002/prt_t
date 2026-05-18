@@ -94,7 +94,30 @@ export default function Home() {
 
       <main className="mx-auto flex max-w-6xl flex-col gap-8 px-6 py-8">
         <section className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold">백테스트 파라미터</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg font-semibold">백테스트 파라미터</h2>
+            <div className="relative flex items-center group cursor-help">
+              <svg
+                className="h-4 w-4 text-zinc-400 transition-colors group-hover:text-zinc-600"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              <div className="absolute left-1/2 bottom-full mb-2 hidden w-64 -translate-x-1/2 flex-col items-center group-hover:flex z-50">
+                <div className="rounded-lg bg-zinc-800 px-3 py-2 text-xs leading-relaxed text-white shadow-lg text-center">
+                  과거 시장 데이터를 기반으로 단기 및 장기 이동평균선(SMA) 크로스오버 전략의 성과를 시뮬레이션하기 위한 변수 설정입니다.
+                </div>
+                <div className="-mt-1 h-2 w-2 rotate-45 bg-zinc-800"></div>
+              </div>
+            </div>
+          </div>
           <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <label className="flex flex-col gap-1 text-sm">
               <span className="font-medium text-zinc-700">Fast SMA</span>
@@ -197,7 +220,30 @@ export default function Home() {
 
         {chartData.length > 0 && (
           <section className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
-            <h2 className="text-lg font-semibold">자산 곡선</h2>
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-semibold">자산 곡선</h2>
+              <div className="relative flex items-center group cursor-help">
+                <svg
+                  className="h-4 w-4 text-zinc-400 transition-colors group-hover:text-zinc-600"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+                <div className="absolute left-1/2 bottom-full mb-2 hidden w-64 -translate-x-1/2 flex-col items-center group-hover:flex z-50">
+                  <div className="rounded-lg bg-zinc-800 px-3 py-2 text-xs leading-relaxed text-white shadow-lg text-center font-normal">
+                    백테스트 기간 동안 시뮬레이션된 포트폴리오의 총 자산(현금 + 보유 주식 가치) 변화 추이를 나타내는 차트입니다.
+                  </div>
+                  <div className="-mt-1 h-2 w-2 rotate-45 bg-zinc-800"></div>
+                </div>
+              </div>
+            </div>
             <div className="mt-4 h-80 w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={chartData} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
