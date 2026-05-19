@@ -9,7 +9,25 @@ import numpy as np
 import pandas as pd
 
 # 임의의 금융상품 시계열 데이터 생성
-def synthetic_ohlcv(days: int = 400, seed: int = 42) -> pd.DataFrame:
+def synthetic_ohlcv2(days: int = 400, seed: int = 42) -> pd.DataFrame:
+    rng = np.random.default_rng(seed)
+    idx = pd.date_range("2023-01-01", periods=days, freq="D")
+    rets = rng.normal(0.0004, 0.018, days)
+    close = 100.0 * np.exp(np.cumsum(rets))
+    noise_h = rng.uniform(0.0, 0.015, days)
+    noise_l = rng.uniform(0.0, 0.015, days)
+    high = close * (1.0 + noise_h)
+    low = close * (1.0 - noise_l)
+    open_ = np.roll(close, 1)
+    open_[0] = close[0]
+    vol = rng.integers(1_000_000, 5_000_000, days).astype(float)
+    return pd.DataFrame(
+        {"Open": open_, "High": high, "Low": low, "Close": close, "Volume": vol},
+        index=idx,
+    )
+
+# 임의의 금융상품 시계열 데이터 생성2
+def synthetic_ohlcv22222(days: int = 400, seed: int = 42) -> pd.DataFrame:
     rng = np.random.default_rng(seed)
     idx = pd.date_range("2023-01-01", periods=days, freq="D")
     rets = rng.normal(0.0004, 0.018, days)
