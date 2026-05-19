@@ -120,7 +120,7 @@ export default function Home() {
           </div>
           <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <label className="flex flex-col gap-1 text-sm">
-              <span className="font-medium text-zinc-700">Fast SMA</span>
+              <span className="font-medium text-zinc-700">단기 SMA</span>
               <input
                 type="number"
                 className="rounded-md border border-zinc-300 px-3 py-2"
@@ -131,7 +131,7 @@ export default function Home() {
               />
             </label>
             <label className="flex flex-col gap-1 text-sm">
-              <span className="font-medium text-zinc-700">Slow SMA</span>
+              <span className="font-medium text-zinc-700">장기 SMA</span>
               <input
                 type="number"
                 className="rounded-md border border-zinc-300 px-3 py-2"
