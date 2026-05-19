@@ -11,6 +11,7 @@ import pandas as pd
 # 이건 VSCODE에서 이다.
 def synthetic_ohlcv3(days: int = 400, seed: int = 42) -> pd.DataFrame:
 # 임의의 금융상품 시계열 데이터 생성
+
 # def synthetic_ohlcv2(days: int = 400, seed: int = 42) -> pd.DataFrame:
     rng = np.random.default_rng(seed)
     idx = pd.date_range("2023-01-01", periods=days, freq="D")
