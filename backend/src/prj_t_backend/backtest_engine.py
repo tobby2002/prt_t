@@ -117,6 +117,7 @@ def run_sma_cross_backtest(
     cerebro = bt.Cerebro()
     cerebro.broker.setcash(cash)
     cerebro.broker.setcommission(commission=commission)
+    # 고의로 충돌을 줌
     cerebro.adddata(PandasOHLCV(dataname=df))
     # amend 
     cerebro.addstrategy(SmaCross, fast=fast, slow=slow)
