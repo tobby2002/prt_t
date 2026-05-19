@@ -269,7 +269,30 @@ export default function Home() {
 
         {detail && detail.trades.length > 0 && (
           <section className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
-            <h2 className="text-lg font-semibold">체결된 거래</h2>
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-semibold">체결된 거래(툴팁추가_amend테스트)</h2>
+              <div className="relative flex items-center group cursor-help">
+                <svg
+                  className="h-4 w-4 text-zinc-400 transition-colors group-hover:text-zinc-600"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+                <div className="absolute left-1/2 bottom-full mb-2 hidden w-64 -translate-x-1/2 flex-col items-center group-hover:flex z-50">
+                  <div className="rounded-lg bg-zinc-800 px-3 py-2 text-xs leading-relaxed text-white shadow-lg text-center font-normal">
+                    백테스트 기간 동안 매수 및 매도 조건에 따라 실제 체결 완료된 거래(Closed Trades) 내역과 손익 정보입니다.
+                  </div>
+                  <div className="-mt-1 h-2 w-2 rotate-45 bg-zinc-800"></div>
+                </div>
+              </div>
+            </div>
             <div className="mt-4 overflow-x-auto">
               <table className="min-w-full border-collapse text-left text-sm">
                 <thead>
