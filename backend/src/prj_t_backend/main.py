@@ -32,7 +32,7 @@ class RunBacktestResponse(BaseModel):
 def _cached_settings() -> Settings:
     return get_settings()
 
-
+# 수정:dev_fe로 배포하기위한 수정 
 def create_app() -> FastAPI:
     settings = _cached_settings()
     app = FastAPI(title="prj_t Backtrader API", version="0.1.0")
