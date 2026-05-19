@@ -10,6 +10,16 @@
             "python": "${workspaceFolder}/backend/.venv/Scripts/python.exe",
             "console": "integratedTerminal",
             "justMyCode": false
+        },
+        {
+            "name": "Next.js: Chrome Debug",
+            "type": "chrome",
+            "request": "launch",
+            "url": "http://localhost:3000",
+            "webRoot": "${workspaceFolder}/frontend",
+            "sourceMapPathOverrides": {
+                "webpack://_N_E/*": "${webRoot}/*"
+            }
         }
     ]
 }
