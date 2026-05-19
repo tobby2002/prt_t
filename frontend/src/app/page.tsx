@@ -71,7 +71,7 @@ export default function Home() {
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">prj_t · Backtrader</h1>
             <p className="mt-1 text-sm text-zinc-600">
-              FastAPI 백엔드에서 SMA 크로스 전략을 실행하고 결과를 확인합니다.
+              FastAPI 백엔드에서 SMA 크로스 전략을 실행하고 결과를 확인합니다. (수정:dev_be)
             </p>
           </div>
           <div className="flex items-center gap-3">
