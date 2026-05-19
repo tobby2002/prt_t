@@ -80,7 +80,7 @@ export default function Home() {
               onClick={checkHealth}
               className="rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-800 shadow-sm hover:bg-zinc-50"
             >
-              API 상태 확인
+              API 상태(Main3) 확인
             </button>
             {apiOk === true && (
               <span className="text-sm font-medium text-emerald-700">백엔드 연결됨</span>
