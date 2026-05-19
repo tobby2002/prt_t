@@ -117,8 +117,11 @@ def run_sma_cross_backtest(
     cerebro = bt.Cerebro()
     cerebro.broker.setcash(cash)
     cerebro.broker.setcommission(commission=commission)
+    # type: ignore[call-arg]
     cerebro.adddata(PandasOHLCV(dataname=df))
+    # amend 
     cerebro.addstrategy(SmaCross, fast=fast, slow=slow)
+    # amend2 with comment
     cerebro.addanalyzer(bt.analyzers.SharpeRatio, riskfreerate=0.0, annualize=True, timeframe=bt.TimeFrame.Days)
     cerebro.addanalyzer(bt.analyzers.DrawDown)
     cerebro.addanalyzer(bt.analyzers.TradeAnalyzer)
