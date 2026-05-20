@@ -54,6 +54,52 @@ def create_app() -> FastAPI:
     def health() -> dict[str, str]:
         return {"status": "good bye"}
 
+    @app.get("/api/mexc/klines")
+    def get_mexc_klines(symbol: str = "BTC_USDT", interval: str = "Min1") -> list[dict[str, Any]]:
+        import urllib.request
+        import json
+
+        # Normalize symbol: e.g. BTCUSDT.P -> BTC_USDT, BTCUSDT -> BTC_USDT
+        sym = symbol.strip().upper()
+        if "." in sym:
+            sym = sym.split(".")[0]
+        if "_" not in sym:
+            if sym.endswith("USDT"):
+                sym = sym[:-4] + "_" + "USDT"
+            else:
+                sym = sym + "_USDT"
+
+        url = f"https://contract.mexc.com/api/v1/contract/kline/{sym}?interval={interval}"
+        try:
+            req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+            with urllib.request.urlopen(req, timeout=5) as response:
+                res_data = json.loads(response.read().decode("utf-8"))
+
+            if not res_data.get("success"):
+                raise HTTPException(status_code=400, detail=f"MEXC API returned success=false: {res_data}")
+
+            data = res_data.get("data", {})
+            # MEXC Contract API returns: { "time": [...], "open": [...], "close": [...], "high": [...], "low": [...] }
+            times = data.get("time", [])
+            opens = data.get("open", [])
+            closes = data.get("close", [])
+            highs = data.get("high", [])
+            lows = data.get("low", [])
+
+            normalized = []
+            for i in range(len(times)):
+                normalized.append({
+                    "time": int(times[i]),
+                    "open": float(opens[i]),
+                    "high": float(highs[i]),
+                    "low": float(lows[i]),
+                    "close": float(closes[i])
+                })
+            return normalized
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to fetch MEXC klines: {str(e)}")
+
+
     @app.post("/api/backtests/run", response_model=RunBacktestResponse)
     def run_backtest(body: RunBacktestRequest) -> RunBacktestResponse:
         try:
