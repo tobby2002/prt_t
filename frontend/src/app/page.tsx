@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import {
   CartesianGrid,
   Line,
@@ -12,6 +13,12 @@ import {
 } from "recharts";
 import type { BacktestDetail, BacktestSummary } from "@/lib/api";
 import { getBacktest, health, runBacktest } from "@/lib/api";
+
+const TVChartContainer = dynamic(
+  () =>
+    import("@/components/TVChartContainer").then((mod) => mod.TVChartContainer),
+  { ssr: false }
+);
 
 const defaultForm = {
   fast: 10,
@@ -32,6 +39,7 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [detail, setDetail] = useState<BacktestDetail | null>(null);
   const [apiOk, setApiOk] = useState<boolean | null>(null);
+  const [activeTab, setActiveTab] = useState<"chart" | "backtest">("chart");
 
   const checkHealth = useCallback(async () => {
     try {
@@ -90,9 +98,47 @@ export default function Home() {
             )}
           </div>
         </div>
+
+        {/* Tab Navigation */}
+        <div className="border-t border-zinc-200 bg-white">
+          <div className="mx-auto max-w-6xl px-6">
+            <div className="flex gap-4">
+              <button
+                onClick={() => setActiveTab("chart")}
+                className={`py-3 px-4 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === "chart"
+                    ? "border-zinc-900 text-zinc-900"
+                    : "border-transparent text-zinc-600 hover:text-zinc-900"
+                }`}
+              >
+                📈 트레이딩 차트
+              </button>
+              <button
+                onClick={() => setActiveTab("backtest")}
+                className={`py-3 px-4 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === "backtest"
+                    ? "border-zinc-900 text-zinc-900"
+                    : "border-transparent text-zinc-600 hover:text-zinc-900"
+                }`}
+              >
+                🔍 백테스트 도구
+              </button>
+            </div>
+          </div>
+        </div>
       </header>
 
       <main className="mx-auto flex max-w-6xl flex-col gap-8 px-6 py-8">
+        {/* Chart Tab */}
+        {activeTab === "chart" && (
+          <div className="rounded-xl border border-zinc-200 bg-white p-0 shadow-sm">
+            <TVChartContainer />
+          </div>
+        )}
+
+        {/* Backtest Tab */}
+        {activeTab === "backtest" && (
+          <>
         <section className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
           <div className="flex items-center gap-2">
             <h2 className="text-lg font-semibold">백테스트 파라미터</h2>
@@ -322,6 +368,8 @@ export default function Home() {
               </table>
             </div>
           </section>
+        )}
+          </>
         )}
       </main>
     </div>
