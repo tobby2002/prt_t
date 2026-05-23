@@ -2,13 +2,15 @@
 
 import { useEffect, useRef, useState } from 'react';
 import {
-  CandlestickData,
+  AreaSeries,
   CandlestickSeries,
+  HistogramSeries,
   createChart,
   ISeriesApi,
   UTCTimestamp,
 } from 'lightweight-charts';
 import { getMexcKlines } from '@/lib/api';
+import type { CandlestickData as ApiCandlestickData } from '@/lib/api';
 
 // Helper to convert user-facing symbols to MEXC Contract / Binance Spot symbols
 const getApiSymbol = (userSymbol: string, exchange: 'binance' | 'mexc'): string => {
@@ -49,8 +51,8 @@ const getApiInterval = (interval: string, exchange: 'binance' | 'mexc'): string 
   return interval;
 };
 
-// Helper to parse Binance Spot klines
-const parseBinanceKlines = (payload: any): CandlestickData[] => {
+// Helper to parse Binance Spot klines (includes volume at index 5)
+const parseBinanceKlines = (payload: any): ApiCandlestickData[] => {
   if (!Array.isArray(payload)) return [];
   return payload.map((item: any) => ({
     time: (item[0] / 1000) as UTCTimestamp,
@@ -58,12 +60,54 @@ const parseBinanceKlines = (payload: any): CandlestickData[] => {
     high: parseFloat(item[2]),
     low: parseFloat(item[3]),
     close: parseFloat(item[4]),
+    volume: parseFloat(item[5]),
   }));
+};
+
+const calculateIchimokuCloud = (data: ApiCandlestickData[]) => {
+  const spanA: { time: UTCTimestamp; value: number }[] = [];
+  const spanB: { time: UTCTimestamp; value: number }[] = [];
+
+  for (let i = 0; i < data.length; i += 1) {
+    const tenkanWindow = data.slice(Math.max(0, i - 8), i + 1);
+    const kijunWindow = data.slice(Math.max(0, i - 25), i + 1);
+
+    const tenkanHigh = Math.max(...tenkanWindow.map((d) => d.high));
+    const tenkanLow = Math.min(...tenkanWindow.map((d) => d.low));
+    const kijunHigh = Math.max(...kijunWindow.map((d) => d.high));
+    const kijunLow = Math.min(...kijunWindow.map((d) => d.low));
+
+    const tenkan = (tenkanHigh + tenkanLow) / 2;
+    const kijun = (kijunHigh + kijunLow) / 2;
+
+    const spanAValue = (tenkan + kijun) / 2;
+    if (i + 26 < data.length) {
+      spanA.push({ time: data[i + 26].time as UTCTimestamp, value: spanAValue });
+    }
+
+    if (i >= 51) {
+      const senkouBHigh = Math.max(...data.slice(i - 51, i + 1).map((d) => d.high));
+      const senkouBLow = Math.min(...data.slice(i - 51, i + 1).map((d) => d.low));
+      const spanBValue = (senkouBHigh + senkouBLow) / 2;
+      if (i + 26 < data.length) {
+        spanB.push({ time: data[i + 26].time as UTCTimestamp, value: spanBValue });
+      }
+    }
+  }
+
+  return { spanA, spanB };
 };
 
 export const TVChartContainer = () => {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const candleSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
+  const volumeSeriesRef = useRef<ISeriesApi<'Histogram'> | null>(null);
+  const ichimokuSeriesARef = useRef<ISeriesApi<'Area'> | null>(null);
+  const ichimokuSeriesBRef = useRef<ISeriesApi<'Area'> | null>(null);
+  const chartRef = useRef<any | null>(null);
+  const lastVolumeDataRef = useRef<{ time: number; value: number }[] | null>(null);
+  const allCandlesRef = useRef<ApiCandlestickData[]>([]);
+  const ichimokuDataRef = useRef<{ spanA: { time: number; value: number }[]; spanB: { time: number; value: number }[] } | null>(null);
 
   const [exchange, setExchange] = useState<'binance' | 'mexc'>('mexc');
   const [symbol, setSymbol] = useState('BTCUSDT.P');
@@ -72,6 +116,8 @@ export const TVChartContainer = () => {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showVolume, setShowVolume] = useState(true);
+  const [showIchimoku, setShowIchimoku] = useState(false);
   const [wsStatus, setWsStatus] = useState<'connecting' | 'connected' | 'disconnected'>('disconnected');
   const [currentPrice, setCurrentPrice] = useState<number | null>(null);
   const [priceChangeDir, setPriceChangeDir] = useState<'up' | 'down' | 'neutral'>('neutral');
@@ -123,12 +169,16 @@ export const TVChartContainer = () => {
   useEffect(() => {
     if (!chartContainerRef.current) return;
 
+    const VOL_UP_COLOR = '#10b981';
+    const VOL_DOWN_COLOR = '#ef4444';
+
     const chart = createChart(chartContainerRef.current, {
       width: chartContainerRef.current.clientWidth || 800,
       height: 500,
       layout: {
         background: { color: '#ffffff' },
         textColor: '#0f172a',
+        panes: { enableResize: true },
       },
       grid: {
         vertLines: { color: '#f1f5f9' },
@@ -153,6 +203,7 @@ export const TVChartContainer = () => {
     });
 
     candleSeriesRef.current = candleSeries;
+    chartRef.current = chart;
 
     const resizeObserver = new ResizeObserver(() => {
       if (chartContainerRef.current) {
@@ -208,15 +259,41 @@ export const TVChartContainer = () => {
           const payload = JSON.parse(event.data);
           const k = payload.k;
           if (k && candleSeriesRef.current) {
-            const candle: CandlestickData = {
+            const candle: ApiCandlestickData = {
               time: (k.t / 1000) as UTCTimestamp,
               open: parseFloat(k.o),
               high: parseFloat(k.h),
               low: parseFloat(k.l),
               close: parseFloat(k.c),
+              volume: k.v ? parseFloat(k.v) : undefined,
             };
-            candleSeriesRef.current.update(candle);
+            candleSeriesRef.current.update(candle as any);
             updateCurrentPrice(parseFloat(k.c));
+
+            const lastIndex = allCandlesRef.current.length - 1;
+            if (lastIndex >= 0 && allCandlesRef.current[lastIndex].time === candle.time) {
+              allCandlesRef.current[lastIndex] = candle;
+            } else {
+              allCandlesRef.current.push(candle);
+            }
+            ichimokuDataRef.current = calculateIchimokuCloud(allCandlesRef.current);
+            if (ichimokuSeriesARef.current && ichimokuDataRef.current) {
+              ichimokuSeriesARef.current.setData(ichimokuDataRef.current.spanA as any);
+            }
+            if (ichimokuSeriesBRef.current && ichimokuDataRef.current) {
+              ichimokuSeriesBRef.current.setData(ichimokuDataRef.current.spanB as any);
+            }
+
+            if (volumeSeriesRef.current && candle.volume !== undefined) {
+              const raw = candle.volume ?? 0;
+              const prevMax = lastVolumeDataRef.current && lastVolumeDataRef.current.length
+                ? Math.max(...lastVolumeDataRef.current.map((v) => v.value))
+                : raw;
+              const capVal = Math.max(1, prevMax * 1.2);
+              const capped = Math.min(raw, capVal);
+              const color = (candle.close ?? 0) >= (candle.open ?? 0) ? VOL_UP_COLOR : VOL_DOWN_COLOR;
+              volumeSeriesRef.current.update({ time: candle.time as UTCTimestamp, value: capped, color } as any);
+            }
           }
         } catch (err) {
           console.warn('Binance WS error parsing kline message', err);
@@ -280,15 +357,41 @@ export const TVChartContainer = () => {
           if (payload.channel === 'push.kline' && payload.data) {
             const k = payload.data;
             if (candleSeriesRef.current) {
-              const candle: CandlestickData = {
+              const candle: ApiCandlestickData = {
                 time: k.t as UTCTimestamp,
                 open: parseFloat(k.o),
                 high: parseFloat(k.h),
                 low: parseFloat(k.l),
                 close: parseFloat(k.c),
+                volume: k.v ? parseFloat(k.v) : k.v2 ? parseFloat(k.v2) : undefined,
               };
-              candleSeriesRef.current.update(candle);
+              candleSeriesRef.current.update(candle as any);
               updateCurrentPrice(parseFloat(k.c));
+
+              const lastIndex = allCandlesRef.current.length - 1;
+              if (lastIndex >= 0 && allCandlesRef.current[lastIndex].time === candle.time) {
+                allCandlesRef.current[lastIndex] = candle;
+              } else {
+                allCandlesRef.current.push(candle);
+              }
+              ichimokuDataRef.current = calculateIchimokuCloud(allCandlesRef.current);
+              if (ichimokuSeriesARef.current && ichimokuDataRef.current) {
+                ichimokuSeriesARef.current.setData(ichimokuDataRef.current.spanA as any);
+              }
+              if (ichimokuSeriesBRef.current && ichimokuDataRef.current) {
+                ichimokuSeriesBRef.current.setData(ichimokuDataRef.current.spanB as any);
+              }
+
+              if (volumeSeriesRef.current && candle.volume !== undefined) {
+                const raw = candle.volume ?? 0;
+                const prevMax = lastVolumeDataRef.current && lastVolumeDataRef.current.length
+                  ? Math.max(...lastVolumeDataRef.current.map((v) => v.value))
+                  : raw;
+                const capVal = Math.max(1, prevMax * 1.2);
+                const capped = Math.min(raw, capVal);
+                const color = (candle.close ?? 0) >= (candle.open ?? 0) ? VOL_UP_COLOR : VOL_DOWN_COLOR;
+                volumeSeriesRef.current.update({ time: candle.time as UTCTimestamp, value: capped, color } as any);
+              }
             }
           }
         } catch (err) {
@@ -328,11 +431,30 @@ export const TVChartContainer = () => {
             const sortedData = [...data].sort((a, b) => a.time - b.time);
             candleSeries.setData(sortedData as any);
             chart.timeScale().fitContent();
+            allCandlesRef.current = sortedData;
+            ichimokuDataRef.current = calculateIchimokuCloud(sortedData);
+            if (ichimokuSeriesARef.current && ichimokuDataRef.current) {
+              ichimokuSeriesARef.current.setData(ichimokuDataRef.current.spanA as any);
+            }
+            if (ichimokuSeriesBRef.current && ichimokuDataRef.current) {
+              ichimokuSeriesBRef.current.setData(ichimokuDataRef.current.spanB as any);
+            }
 
             const latest = sortedData[sortedData.length - 1];
             if (latest) {
               setCurrentPrice(latest.close);
             }
+            // set volume series data if available (with up/down color and value capping)
+            const vols = sortedData.map((d) => d.volume ?? 0);
+            const maxVol = vols.length ? Math.max(...vols) : 1;
+            const cap = Math.max(1, maxVol * 1.2);
+            const volData = sortedData.map((d) => ({
+              time: d.time,
+              value: Math.min(d.volume ?? 0, cap),
+              color: (d.close ?? 0) >= (d.open ?? 0) ? VOL_UP_COLOR : VOL_DOWN_COLOR,
+            }));
+            lastVolumeDataRef.current = volData;
+            if (volumeSeriesRef.current) volumeSeriesRef.current.setData(volData as any);
           } else {
             setError('MEXC로부터 캔들 데이터를 받아오지 못했습니다.');
           }
@@ -347,13 +469,31 @@ export const TVChartContainer = () => {
           if (isCancelled) return;
           const candles = parseBinanceKlines(payload);
           if (candles.length > 0) {
-            candleSeries.setData(candles);
+            candleSeries.setData(candles as any);
             chart.timeScale().fitContent();
+            allCandlesRef.current = candles;
+            ichimokuDataRef.current = calculateIchimokuCloud(candles);
+            if (ichimokuSeriesARef.current && ichimokuDataRef.current) {
+              ichimokuSeriesARef.current.setData(ichimokuDataRef.current.spanA as any);
+            }
+            if (ichimokuSeriesBRef.current && ichimokuDataRef.current) {
+              ichimokuSeriesBRef.current.setData(ichimokuDataRef.current.spanB as any);
+            }
 
             const latest = candles[candles.length - 1];
             if (latest) {
               setCurrentPrice(latest.close);
             }
+            const vols = candles.map((d) => d.volume ?? 0);
+            const maxVol = vols.length ? Math.max(...vols) : 1;
+            const cap = Math.max(1, maxVol * 1.2);
+            const volData = candles.map((d) => ({
+              time: d.time,
+              value: Math.min(d.volume ?? 0, cap),
+              color: (d.close ?? 0) >= (d.open ?? 0) ? VOL_UP_COLOR : VOL_DOWN_COLOR,
+            }));
+            lastVolumeDataRef.current = volData;
+            if (volumeSeriesRef.current) volumeSeriesRef.current.setData(volData as any);
           } else {
             setError('Binance로부터 캔들 데이터를 받아오지 못했습니다.');
           }
@@ -374,7 +514,61 @@ export const TVChartContainer = () => {
       }
     };
 
+    // Helper to create volume histogram series
+    const createVolumeSeries = () => {
+      if (!chartRef.current) return null;
+      const s = chartRef.current.addSeries(HistogramSeries, {
+        color: '#4c51bf',
+        priceFormat: { type: 'volume' },
+        priceScaleId: '',
+        scaleMargins: { top: 0.8, bottom: 0 },
+      });
+      volumeSeriesRef.current = s;
+      if (lastVolumeDataRef.current) s.setData(lastVolumeDataRef.current as any);
+      return s;
+    };
+
+    const createIchimokuSeries = () => {
+      if (!chartRef.current) return null;
+      const a = chartRef.current.addSeries(AreaSeries, {
+        topColor: 'rgba(34,197,94,0.20)',
+        bottomColor: 'rgba(34,197,94,0.05)',
+        lineColor: '#22c55e',
+        lineWidth: 1,
+        priceLineVisible: false,
+        lastValueVisible: false,
+        priceScaleId: '',
+      });
+      ichimokuSeriesARef.current = a;
+
+      const b = chartRef.current.addSeries(AreaSeries, {
+        topColor: 'rgba(251,113,133,0.16)',
+        bottomColor: 'rgba(251,113,133,0.04)',
+        lineColor: '#fb7185',
+        lineWidth: 1,
+        priceLineVisible: false,
+        lastValueVisible: false,
+        priceScaleId: '',
+      });
+      ichimokuSeriesBRef.current = b;
+
+      if (ichimokuDataRef.current) {
+        a.setData(ichimokuDataRef.current.spanA as any);
+        b.setData(ichimokuDataRef.current.spanB as any);
+      }
+
+      return { a, b };
+    };
+
     loadData();
+
+    // create initial volume series if enabled
+    if (showVolume) {
+      createVolumeSeries();
+    }
+    if (showIchimoku) {
+      createIchimokuSeries();
+    }
 
     return () => {
       isCancelled = true;
@@ -383,9 +577,96 @@ export const TVChartContainer = () => {
       if (pingTimer) clearInterval(pingTimer);
       if (priceDirTimeoutRef.current) clearTimeout(priceDirTimeoutRef.current);
       resizeObserver.disconnect();
+      if (volumeSeriesRef.current && chartRef.current) {
+        try {
+          chartRef.current.removeSeries(volumeSeriesRef.current);
+        } catch (_) {}
+      }
+      if (ichimokuSeriesARef.current && chartRef.current) {
+        try {
+          chartRef.current.removeSeries(ichimokuSeriesARef.current);
+        } catch (_) {}
+      }
+      if (ichimokuSeriesBRef.current && chartRef.current) {
+        try {
+          chartRef.current.removeSeries(ichimokuSeriesBRef.current);
+        } catch (_) {}
+      }
       chart.remove();
     };
   }, [exchange, symbol, interval]);
+
+  // watch showVolume and add/remove series without recreating chart
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart) return;
+    if (showVolume) {
+      if (!volumeSeriesRef.current) {
+        const s = chart.addSeries(HistogramSeries, {
+          color: '#4c51bf',
+          priceFormat: { type: 'volume' },
+          priceScaleId: '',
+          scaleMargins: { top: 0.8, bottom: 0 },
+        });
+        volumeSeriesRef.current = s;
+        if (lastVolumeDataRef.current) s.setData(lastVolumeDataRef.current as any);
+      }
+    } else {
+      if (volumeSeriesRef.current) {
+        try {
+          chart.removeSeries(volumeSeriesRef.current);
+        } catch (_) {}
+        volumeSeriesRef.current = null;
+      }
+    }
+  }, [showVolume]);
+
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart) return;
+
+    if (showIchimoku) {
+      if (!ichimokuSeriesARef.current || !ichimokuSeriesBRef.current) {
+        const a = chart.addSeries(AreaSeries, {
+          topColor: 'rgba(34,197,94,0.20)',
+          bottomColor: 'rgba(34,197,94,0.05)',
+          lineColor: '#22c55e',
+          lineWidth: 1,
+          priceLineVisible: false,
+          lastValueVisible: false,
+          priceScaleId: '',
+        });
+        const b = chart.addSeries(AreaSeries, {
+          topColor: 'rgba(251,113,133,0.16)',
+          bottomColor: 'rgba(251,113,133,0.04)',
+          lineColor: '#fb7185',
+          lineWidth: 1,
+          priceLineVisible: false,
+          lastValueVisible: false,
+          priceScaleId: '',
+        });
+        ichimokuSeriesARef.current = a;
+        ichimokuSeriesBRef.current = b;
+      }
+      if (ichimokuDataRef.current) {
+        ichimokuSeriesARef.current?.setData(ichimokuDataRef.current.spanA as any);
+        ichimokuSeriesBRef.current?.setData(ichimokuDataRef.current.spanB as any);
+      }
+    } else {
+      if (ichimokuSeriesARef.current) {
+        try {
+          chart.removeSeries(ichimokuSeriesARef.current);
+        } catch (_) {}
+        ichimokuSeriesARef.current = null;
+      }
+      if (ichimokuSeriesBRef.current) {
+        try {
+          chart.removeSeries(ichimokuSeriesBRef.current);
+        } catch (_) {}
+        ichimokuSeriesBRef.current = null;
+      }
+    }
+  }, [showIchimoku]);
 
   const quickSymbols = exchange === 'mexc'
     ? ['BTCUSDT.P', 'ETHUSDT.P', 'SOLUSDT.P', 'XRPUSDT.P']
@@ -430,6 +711,25 @@ export const TVChartContainer = () => {
             <option value="1h">1시간봉 (1h)</option>
             <option value="1d">1일봉 (1d)</option>
           </select>
+
+          <button
+            onClick={() => setShowVolume((s) => !s)}
+            className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all duration-200 ${showVolume
+                ? 'bg-white text-zinc-900 shadow-sm'
+                : 'text-zinc-600 hover:text-zinc-900'
+              }`}
+          >
+            볼륨
+          </button>
+          <button
+            onClick={() => setShowIchimoku((s) => !s)}
+            className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all duration-200 ${showIchimoku
+                ? 'bg-white text-zinc-900 shadow-sm'
+                : 'text-zinc-600 hover:text-zinc-900'
+              }`}
+          >
+            일목 구름
+          </button>
 
           {/* Connection status badge */}
           <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-zinc-200 bg-white shadow-sm">

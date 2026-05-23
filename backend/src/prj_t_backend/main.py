@@ -86,14 +86,29 @@ def create_app() -> FastAPI:
             highs = data.get("high", [])
             lows = data.get("low", [])
 
+            # Attempt to locate a volume array under common keys
+            vol_keys = ["volume", "vol", "amount", "volumes"]
+            volumes = None
+            for k in vol_keys:
+                if k in data:
+                    volumes = data.get(k, [])
+                    break
+
             normalized = []
             for i in range(len(times)):
+                vol_val = None
+                if volumes and i < len(volumes):
+                    try:
+                        vol_val = float(volumes[i])
+                    except Exception:
+                        vol_val = None
                 normalized.append({
                     "time": int(times[i]),
                     "open": float(opens[i]),
                     "high": float(highs[i]),
                     "low": float(lows[i]),
-                    "close": float(closes[i])
+                    "close": float(closes[i]),
+                    "volume": vol_val if vol_val is not None else 0.0,
                 })
             return normalized
         except Exception as e:

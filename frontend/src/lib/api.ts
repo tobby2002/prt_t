@@ -80,6 +80,7 @@ export type CandlestickData = {
   high: number;
   low: number;
   close: number;
+  volume?: number;
 };
 
 export async function getMexcKlines(symbol: string, interval: string): Promise<CandlestickData[]> {
