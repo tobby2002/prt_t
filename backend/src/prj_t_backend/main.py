@@ -72,7 +72,7 @@ def create_app() -> FastAPI:
         url = f"https://contract.mexc.com/api/v1/contract/kline/{sym}?interval={interval}"
         try:
             req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-            with urllib.request.urlopen(req, timeout=5) as response:
+            with urllib.request.urlopen(req, timeout=15) as response:
                 res_data = json.loads(response.read().decode("utf-8"))
 
             if not res_data.get("success"):

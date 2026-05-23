@@ -164,12 +164,14 @@ export const TVChartContainer = () => {
     });
     resizeObserver.observe(chartContainerRef.current);
 
+    let isCancelled = false;
     let socket: WebSocket | null = null;
-    let reconnectTimer: NodeJS.Timeout | null = null;
-    let pingTimer: NodeJS.Timeout | null = null;
+    let reconnectTimer: any = null;
+    let pingTimer: any = null;
     let reconnectAttempts = 0;
 
     const scheduleReconnect = () => {
+      if (isCancelled) return;
       if (reconnectAttempts > 8) {
         setError('실시간 연결이 끊어졌습니다. 새로고침하여 재연결해 주세요.');
         return;
@@ -177,6 +179,7 @@ export const TVChartContainer = () => {
       reconnectAttempts++;
       const delay = Math.min(30000, 1000 * 2 ** (reconnectAttempts - 1));
       reconnectTimer = setTimeout(() => {
+        if (isCancelled) return;
         if (exchange === 'mexc') connectMexc();
         else connectBinance();
       }, delay);
@@ -193,12 +196,14 @@ export const TVChartContainer = () => {
       socket = new WebSocket(wsUrl);
 
       socket.onopen = () => {
+        if (isCancelled) return;
         setWsStatus('connected');
         reconnectAttempts = 0;
         setError(null);
       };
 
       socket.onmessage = (event) => {
+        if (isCancelled) return;
         try {
           const payload = JSON.parse(event.data);
           const k = payload.k;
@@ -219,10 +224,12 @@ export const TVChartContainer = () => {
       };
 
       socket.onerror = () => {
+        if (isCancelled) return;
         setWsStatus('disconnected');
       };
 
       socket.onclose = (event) => {
+        if (isCancelled) return;
         setWsStatus('disconnected');
         if (event.code !== 1000 && event.code !== 1005) {
           scheduleReconnect();
@@ -241,6 +248,7 @@ export const TVChartContainer = () => {
       socket = new WebSocket(wsUrl);
 
       socket.onopen = () => {
+        if (isCancelled) return;
         setWsStatus('connected');
         reconnectAttempts = 0;
         setError(null);
@@ -253,10 +261,12 @@ export const TVChartContainer = () => {
             interval: apiInterval,
           },
         };
-        socket.send(JSON.stringify(subMsg));
+        if (socket) {
+          socket.send(JSON.stringify(subMsg));
+        }
 
         // Start ping heartbeat every 30s
-        pingTimer = setInterval(() => {
+        pingTimer = window.setInterval(() => {
           if (socket && socket.readyState === WebSocket.OPEN) {
             socket.send(JSON.stringify({ method: 'ping' }));
           }
@@ -264,6 +274,7 @@ export const TVChartContainer = () => {
       };
 
       socket.onmessage = (event) => {
+        if (isCancelled) return;
         try {
           const payload = JSON.parse(event.data);
           if (payload.channel === 'push.kline' && payload.data) {
@@ -286,10 +297,12 @@ export const TVChartContainer = () => {
       };
 
       socket.onerror = () => {
+        if (isCancelled) return;
         setWsStatus('disconnected');
       };
 
       socket.onclose = (event) => {
+        if (isCancelled) return;
         setWsStatus('disconnected');
         if (pingTimer) clearInterval(pingTimer);
         if (event.code !== 1000 && event.code !== 1005) {
@@ -310,6 +323,7 @@ export const TVChartContainer = () => {
       try {
         if (exchange === 'mexc') {
           const data = await getMexcKlines(apiSymbol, apiInterval);
+          if (isCancelled) return;
           if (data.length > 0) {
             const sortedData = [...data].sort((a, b) => a.time - b.time);
             candleSeries.setData(sortedData as any);
@@ -325,10 +339,12 @@ export const TVChartContainer = () => {
         } else {
           const url = `https://api.binance.com/api/v3/klines?symbol=${apiSymbol}&interval=${apiInterval}&limit=300`;
           const res = await fetch(url);
+          if (isCancelled) return;
           if (!res.ok) {
             throw new Error(`Binance API 오류: ${res.status}`);
           }
           const payload = await res.json();
+          if (isCancelled) return;
           const candles = parseBinanceKlines(payload);
           if (candles.length > 0) {
             candleSeries.setData(candles);
@@ -344,19 +360,24 @@ export const TVChartContainer = () => {
         }
 
         // Connect WS
+        if (isCancelled) return;
         if (exchange === 'mexc') connectMexc();
         else connectBinance();
       } catch (err: any) {
+        if (isCancelled) return;
         console.error(err);
         setError(err instanceof Error ? err.message : String(err));
       } finally {
-        setLoading(false);
+        if (!isCancelled) {
+          setLoading(false);
+        }
       }
     };
 
     loadData();
 
     return () => {
+      isCancelled = true;
       if (socket) socket.close();
       if (reconnectTimer) clearTimeout(reconnectTimer);
       if (pingTimer) clearInterval(pingTimer);
@@ -379,21 +400,19 @@ export const TVChartContainer = () => {
           <div className="flex bg-zinc-200 p-0.5 rounded-lg border border-zinc-300 shadow-inner">
             <button
               onClick={() => handleExchangeChange('mexc')}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all duration-200 ${
-                exchange === 'mexc'
+              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all duration-200 ${exchange === 'mexc'
                   ? 'bg-white text-zinc-900 shadow-sm'
                   : 'text-zinc-600 hover:text-zinc-900'
-              }`}
+                }`}
             >
               MEXC 선물 (.P)
             </button>
             <button
               onClick={() => handleExchangeChange('binance')}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all duration-200 ${
-                exchange === 'binance'
+              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all duration-200 ${exchange === 'binance'
                   ? 'bg-white text-zinc-900 shadow-sm'
                   : 'text-zinc-600 hover:text-zinc-900'
-              }`}
+                }`}
             >
               Binance 현물
             </button>
@@ -421,13 +440,12 @@ export const TVChartContainer = () => {
               {wsStatus === 'connecting' && (
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
               )}
-              <span className={`relative inline-flex rounded-full h-2 w-2 ${
-                wsStatus === 'connected'
+              <span className={`relative inline-flex rounded-full h-2 w-2 ${wsStatus === 'connected'
                   ? 'bg-emerald-500'
                   : wsStatus === 'connecting'
-                  ? 'bg-amber-500'
-                  : 'bg-red-500'
-              }`}></span>
+                    ? 'bg-amber-500'
+                    : 'bg-red-500'
+                }`}></span>
             </span>
             <span className="text-2xs font-bold uppercase tracking-wider text-zinc-500">
               WS {wsStatus === 'connected' ? '연결됨' : wsStatus === 'connecting' ? '연결중' : '연결끊김'}
@@ -439,13 +457,12 @@ export const TVChartContainer = () => {
         <div className="flex items-center gap-6">
           <div className="flex flex-col items-end">
             <span className="text-3xs font-bold uppercase tracking-wider text-zinc-400">실시간 체결가</span>
-            <span className={`text-xl font-bold font-mono transition-all duration-300 ${
-              priceChangeDir === 'up'
+            <span className={`text-xl font-bold font-mono transition-all duration-300 ${priceChangeDir === 'up'
                 ? 'text-emerald-500 scale-105'
                 : priceChangeDir === 'down'
-                ? 'text-red-500 scale-105'
-                : 'text-zinc-900'
-            }`}>
+                  ? 'text-red-500 scale-105'
+                  : 'text-zinc-900'
+              }`}>
               {currentPrice !== null
                 ? currentPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })
                 : '—'}
@@ -462,11 +479,10 @@ export const TVChartContainer = () => {
             <button
               key={qs}
               onClick={() => handleQuickSymbol(qs)}
-              className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
-                symbol === qs
+              className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${symbol === qs
                   ? 'bg-zinc-900 text-white'
                   : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200 hover:text-zinc-900'
-              }`}
+                }`}
             >
               {qs}
             </button>
@@ -499,7 +515,7 @@ export const TVChartContainer = () => {
             {error}
           </div>
         )}
-        
+
         {loading && (
           <div className="absolute inset-0 z-25 flex items-center justify-center bg-white/70 backdrop-blur-xs">
             <div className="flex flex-col items-center gap-2">
