@@ -68,6 +68,9 @@ const calculateIchimokuCloud = (data: ApiCandlestickData[]) => {
   const spanA: { time: UTCTimestamp; value: number }[] = [];
   const spanB: { time: UTCTimestamp; value: number }[] = [];
 
+  if (data.length === 0) return { spanA, spanB };
+
+  // Calculate for historical data
   for (let i = 0; i < data.length; i += 1) {
     const tenkanWindow = data.slice(Math.max(0, i - 8), i + 1);
     const kijunWindow = data.slice(Math.max(0, i - 25), i + 1);
@@ -91,6 +94,55 @@ const calculateIchimokuCloud = (data: ApiCandlestickData[]) => {
       const spanBValue = (senkouBHigh + senkouBLow) / 2;
       if (i + 26 < data.length) {
         spanB.push({ time: data[i + 26].time as UTCTimestamp, value: spanBValue });
+      }
+    }
+  }
+
+  // Calculate future part: shift the last 26 calculated values forward
+  const lastDataIdx = data.length - 1;
+  if (lastDataIdx >= 0) {
+    const candle_interval = lastDataIdx > 0 ? data[lastDataIdx].time - data[lastDataIdx - 1].time : 60;
+
+    // Collect the span A and B values for the last 26 periods
+    const futureSpanAValues: number[] = [];
+    const futureSpanBValues: number[] = [];
+
+    // Calculate span A and B for i from (lastDataIdx - 25) to lastDataIdx
+    for (let i = Math.max(0, lastDataIdx - 25); i <= lastDataIdx; i += 1) {
+      const tenkanWindow = data.slice(Math.max(0, i - 8), i + 1);
+      const kijunWindow = data.slice(Math.max(0, i - 25), i + 1);
+
+      const tenkanHigh = Math.max(...tenkanWindow.map((d) => d.high));
+      const tenkanLow = Math.min(...tenkanWindow.map((d) => d.low));
+      const kijunHigh = Math.max(...kijunWindow.map((d) => d.high));
+      const kijunLow = Math.min(...kijunWindow.map((d) => d.low));
+
+      const tenkan = (tenkanHigh + tenkanLow) / 2;
+      const kijun = (kijunHigh + kijunLow) / 2;
+      const spanAValue = (tenkan + kijun) / 2;
+      futureSpanAValues.push(spanAValue);
+    }
+
+    for (let i = Math.max(0, lastDataIdx - 25); i <= lastDataIdx; i += 1) {
+      let spanBValue = 0;
+      if (i >= 51) {
+        const senkouBHigh = Math.max(...data.slice(i - 51, i + 1).map((d) => d.high));
+        const senkouBLow = Math.min(...data.slice(i - 51, i + 1).map((d) => d.low));
+        spanBValue = (senkouBHigh + senkouBLow) / 2;
+      }
+      futureSpanBValues.push(spanBValue);
+    }
+
+    // Shift these values 26 periods into the future
+    for (let j = 1; j <= 26; j++) {
+      const futureTime = (data[lastDataIdx].time + j * candle_interval) as UTCTimestamp;
+      const valueIdx = j - 1; // Maps j=1 to index 0, j=2 to index 1, etc.
+
+      if (valueIdx < futureSpanAValues.length) {
+        spanA.push({ time: futureTime, value: futureSpanAValues[valueIdx] });
+      }
+      if (valueIdx < futureSpanBValues.length) {
+        spanB.push({ time: futureTime, value: futureSpanBValues[valueIdx] });
       }
     }
   }
@@ -531,7 +583,7 @@ export const TVChartContainer = () => {
     const createIchimokuSeries = () => {
       if (!chartRef.current) return null;
       const a = chartRef.current.addSeries(LineSeries, {
-        color: '#22c55e',
+        color: 'rgba(128, 128, 128, 0.5)',
         lineWidth: 2,
         priceLineVisible: false,
         lastValueVisible: false,
@@ -539,7 +591,7 @@ export const TVChartContainer = () => {
       ichimokuSeriesARef.current = a;
 
       const b = chartRef.current.addSeries(LineSeries, {
-        color: '#fb7185',
+        color: 'rgba(128, 128, 128, 0.5)',
         lineWidth: 2,
         priceLineVisible: false,
         lastValueVisible: false,
@@ -622,13 +674,13 @@ export const TVChartContainer = () => {
     if (showIchimoku) {
       if (!ichimokuSeriesARef.current || !ichimokuSeriesBRef.current) {
         const a = chart.addSeries(LineSeries, {
-          color: '#22c55e',
+          color: 'rgba(128, 128, 128, 0.5)',
           lineWidth: 2,
           priceLineVisible: false,
           lastValueVisible: false,
         });
         const b = chart.addSeries(LineSeries, {
-          color: '#fb7185',
+          color: 'rgba(128, 128, 128, 0.5)',
           lineWidth: 2,
           priceLineVisible: false,
           lastValueVisible: false,
