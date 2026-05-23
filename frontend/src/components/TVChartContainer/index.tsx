@@ -2,9 +2,9 @@
 
 import { useEffect, useRef, useState } from 'react';
 import {
-  AreaSeries,
   CandlestickSeries,
   HistogramSeries,
+  LineSeries,
   createChart,
   ISeriesApi,
   UTCTimestamp,
@@ -102,8 +102,8 @@ export const TVChartContainer = () => {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const candleSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
   const volumeSeriesRef = useRef<ISeriesApi<'Histogram'> | null>(null);
-  const ichimokuSeriesARef = useRef<ISeriesApi<'Area'> | null>(null);
-  const ichimokuSeriesBRef = useRef<ISeriesApi<'Area'> | null>(null);
+  const ichimokuSeriesARef = useRef<ISeriesApi<'Line'> | null>(null);
+  const ichimokuSeriesBRef = useRef<ISeriesApi<'Line'> | null>(null);
   const chartRef = useRef<any | null>(null);
   const lastVolumeDataRef = useRef<{ time: number; value: number }[] | null>(null);
   const allCandlesRef = useRef<ApiCandlestickData[]>([]);
@@ -530,25 +530,19 @@ export const TVChartContainer = () => {
 
     const createIchimokuSeries = () => {
       if (!chartRef.current) return null;
-      const a = chartRef.current.addSeries(AreaSeries, {
-        topColor: 'rgba(34,197,94,0.20)',
-        bottomColor: 'rgba(34,197,94,0.05)',
-        lineColor: '#22c55e',
-        lineWidth: 1,
+      const a = chartRef.current.addSeries(LineSeries, {
+        color: '#22c55e',
+        lineWidth: 2,
         priceLineVisible: false,
         lastValueVisible: false,
-        priceScaleId: '',
       });
       ichimokuSeriesARef.current = a;
 
-      const b = chartRef.current.addSeries(AreaSeries, {
-        topColor: 'rgba(251,113,133,0.16)',
-        bottomColor: 'rgba(251,113,133,0.04)',
-        lineColor: '#fb7185',
-        lineWidth: 1,
+      const b = chartRef.current.addSeries(LineSeries, {
+        color: '#fb7185',
+        lineWidth: 2,
         priceLineVisible: false,
         lastValueVisible: false,
-        priceScaleId: '',
       });
       ichimokuSeriesBRef.current = b;
 
@@ -627,23 +621,17 @@ export const TVChartContainer = () => {
 
     if (showIchimoku) {
       if (!ichimokuSeriesARef.current || !ichimokuSeriesBRef.current) {
-        const a = chart.addSeries(AreaSeries, {
-          topColor: 'rgba(34,197,94,0.20)',
-          bottomColor: 'rgba(34,197,94,0.05)',
-          lineColor: '#22c55e',
-          lineWidth: 1,
+        const a = chart.addSeries(LineSeries, {
+          color: '#22c55e',
+          lineWidth: 2,
           priceLineVisible: false,
           lastValueVisible: false,
-          priceScaleId: '',
         });
-        const b = chart.addSeries(AreaSeries, {
-          topColor: 'rgba(251,113,133,0.16)',
-          bottomColor: 'rgba(251,113,133,0.04)',
-          lineColor: '#fb7185',
-          lineWidth: 1,
+        const b = chart.addSeries(LineSeries, {
+          color: '#fb7185',
+          lineWidth: 2,
           priceLineVisible: false,
           lastValueVisible: false,
-          priceScaleId: '',
         });
         ichimokuSeriesARef.current = a;
         ichimokuSeriesBRef.current = b;
