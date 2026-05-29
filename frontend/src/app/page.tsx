@@ -130,11 +130,9 @@ export default function Home() {
 
       <main className="mx-auto flex max-w-6xl flex-col gap-8 px-6 py-8">
         {/* Chart Tab */}
-        {activeTab === "chart" && (
-          <div className="rounded-xl border border-zinc-200 bg-white p-0 shadow-sm">
-            <TVChartContainer />
-          </div>
-        )}
+        <div className={`rounded-xl border border-zinc-200 bg-white p-0 shadow-sm ${activeTab === "chart" ? "block" : "hidden"}`}>
+          <TVChartContainer />
+        </div>
 
         {/* Backtest Tab */}
         {activeTab === "backtest" && (

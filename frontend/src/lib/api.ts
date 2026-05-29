@@ -83,11 +83,20 @@ export type CandlestickData = {
   volume?: number;
 };
 
-export async function getMexcKlines(symbol: string, interval: string): Promise<CandlestickData[]> {
-  const res = await fetch(
-    `${apiBaseUrl()}/api/mexc/klines?symbol=${encodeURIComponent(symbol)}&interval=${encodeURIComponent(interval)}`,
-    { method: "GET", cache: "no-store" }
-  );
+export async function getMexcKlines(
+  symbol: string,
+  interval: string,
+  start?: number,
+  end?: number
+): Promise<CandlestickData[]> {
+  let url = `${apiBaseUrl()}/api/mexc/klines?symbol=${encodeURIComponent(symbol)}&interval=${encodeURIComponent(interval)}`;
+  if (start !== undefined) {
+    url += `&start=${start}`;
+  }
+  if (end !== undefined) {
+    url += `&end=${end}`;
+  }
+  const res = await fetch(url, { method: "GET", cache: "no-store" });
   if (!res.ok) {
     const text = await res.text();
     throw new Error(text || `HTTP ${res.status}`);

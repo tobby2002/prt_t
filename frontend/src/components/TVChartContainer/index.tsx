@@ -256,13 +256,13 @@ export const TVChartContainer = () => {
 
     candleSeriesRef.current = candleSeries;
     chartRef.current = chart;
-
     const resizeObserver = new ResizeObserver(() => {
       if (chartContainerRef.current) {
-        chart.applyOptions({
-          width: chartContainerRef.current.clientWidth,
-          height: chartContainerRef.current.clientHeight || 500,
-        });
+        const width = chartContainerRef.current.clientWidth;
+        const height = chartContainerRef.current.clientHeight || 500;
+        if (width > 0) {
+          chart.applyOptions({ width, height });
+        }
       }
     });
     resizeObserver.observe(chartContainerRef.current);

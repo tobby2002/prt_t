@@ -55,7 +55,12 @@ def create_app() -> FastAPI:
         return {"status": "good bye"}
 
     @app.get("/api/mexc/klines")
-    def get_mexc_klines(symbol: str = "BTC_USDT", interval: str = "Min1") -> list[dict[str, Any]]:
+    def get_mexc_klines(
+        symbol: str = "BTC_USDT",
+        interval: str = "Min1",
+        start: int | None = None,
+        end: int | None = None
+    ) -> list[dict[str, Any]]:
         import urllib.request
         import json
 
@@ -70,6 +75,10 @@ def create_app() -> FastAPI:
                 sym = sym + "_USDT"
 
         url = f"https://contract.mexc.com/api/v1/contract/kline/{sym}?interval={interval}"
+        if start is not None:
+            url += f"&start={start}"
+        if end is not None:
+            url += f"&end={end}"
         try:
             req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
             with urllib.request.urlopen(req, timeout=15) as response:
