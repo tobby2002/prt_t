@@ -616,8 +616,113 @@ export const TVChartContainer = () => {
       createIchimokuSeries();
     }
 
+    let isFetchingHistory = false;
+    let hasMoreHistory = true;
+
+    const handleVisibleRangeChange = async (newRange: any) => {
+      if (newRange === null || isFetchingHistory || !hasMoreHistory || isCancelled) return;
+
+      // 사용자가 왼쪽 경계 근처로 스크롤한 경우 (보이는 캔들 인덱스 < 15)
+      if (newRange.from < 15) {
+        isFetchingHistory = true;
+        try {
+          const firstCandle = allCandlesRef.current[0];
+          if (!firstCandle) {
+            isFetchingHistory = false;
+            return;
+          }
+          const firstCandleTime = firstCandle.time;
+
+          let newKlines: ApiCandlestickData[] = [];
+          const apiSymbol = getApiSymbol(symbol, exchange);
+          const apiInterval = getApiInterval(interval, exchange);
+
+          if (exchange === 'mexc') {
+            const end = firstCandleTime - 1;
+            const data = await getMexcKlines(apiSymbol, apiInterval, undefined, end);
+            if (isCancelled) return;
+            if (data && data.length > 0) {
+              newKlines = [...data].sort((a, b) => a.time - b.time);
+            }
+          } else {
+            const endTimeMs = (firstCandleTime * 1000) - 1;
+            const url = `https://api.binance.com/api/v3/klines?symbol=${apiSymbol}&interval=${apiInterval}&limit=300&endTime=${endTimeMs}`;
+            const res = await fetch(url);
+            if (isCancelled) return;
+            if (res.ok) {
+              const payload = await res.json();
+              newKlines = parseBinanceKlines(payload);
+            }
+          }
+
+          if (newKlines.length === 0) {
+            hasMoreHistory = false;
+            isFetchingHistory = false;
+            return;
+          }
+
+          // 중복 시간 제거 및 기존 데이터와 결합
+          const existingTimes = new Set(allCandlesRef.current.map((c) => c.time));
+          const filteredNew = newKlines.filter((c) => !existingTimes.has(c.time));
+
+          if (filteredNew.length === 0) {
+            hasMoreHistory = false;
+            isFetchingHistory = false;
+            return;
+          }
+
+          const combinedCandles = [...filteredNew, ...allCandlesRef.current].sort((a, b) => a.time - b.time);
+          allCandlesRef.current = combinedCandles;
+
+          // 일목구름 재계산
+          ichimokuDataRef.current = calculateIchimokuCloud(combinedCandles);
+
+          // 메인 캔들스틱 데이터 업데이트
+          candleSeries.setData(combinedCandles as any);
+
+          // 거래량 시리즈 업데이트
+          const VOL_UP_COLOR = '#10b981';
+          const VOL_DOWN_COLOR = '#ef4444';
+          const vols = combinedCandles.map((d) => d.volume ?? 0);
+          const maxVol = vols.length ? Math.max(...vols) : 1;
+          const cap = Math.max(1, maxVol * 1.2);
+          const volData = combinedCandles.map((d) => ({
+            time: d.time,
+            value: Math.min(d.volume ?? 0, cap),
+            color: (d.close ?? 0) >= (d.open ?? 0) ? VOL_UP_COLOR : VOL_DOWN_COLOR,
+          }));
+          lastVolumeDataRef.current = volData;
+          if (volumeSeriesRef.current) {
+            volumeSeriesRef.current.setData(volData as any);
+          }
+
+          // 일목구름 시리즈 업데이트
+          if (ichimokuSeriesARef.current && ichimokuSeriesBRef.current && ichimokuDataRef.current) {
+            ichimokuSeriesARef.current.setData(ichimokuDataRef.current.spanA as any);
+            ichimokuSeriesBRef.current.setData(ichimokuDataRef.current.spanB as any);
+          }
+
+          // 화면이 튀는 현상 방지를 위해 가시 영역 재설정 (Shift)
+          const N = filteredNew.length;
+          chart.timeScale().setVisibleLogicalRange({
+            from: newRange.from + N,
+            to: newRange.to + N,
+          });
+        } catch (err) {
+          console.error("Failed to load historical klines", err);
+        } finally {
+          isFetchingHistory = false;
+        }
+      }
+    };
+
+    chart.timeScale().subscribeVisibleLogicalRangeChange(handleVisibleRangeChange);
+
     return () => {
       isCancelled = true;
+      try {
+        chart.timeScale().unsubscribeVisibleLogicalRangeChange(handleVisibleRangeChange);
+      } catch (_) {}
       if (socket) socket.close();
       if (reconnectTimer) clearTimeout(reconnectTimer);
       if (pingTimer) clearInterval(pingTimer);
