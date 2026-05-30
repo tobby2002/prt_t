@@ -173,6 +173,7 @@ export const TVChartContainer = () => {
   const [wsStatus, setWsStatus] = useState<'connecting' | 'connected' | 'disconnected'>('disconnected');
   const [currentPrice, setCurrentPrice] = useState<number | null>(null);
   const [priceChangeDir, setPriceChangeDir] = useState<'up' | 'down' | 'neutral'>('neutral');
+  const [showScrollToLatest, setShowScrollToLatest] = useState(false);
 
   const priceDirTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -199,6 +200,19 @@ export const TVChartContainer = () => {
   const handleQuickSymbol = (quickSym: string) => {
     setSymbol(quickSym);
     setInputSymbol(quickSym);
+  };
+
+  const setChartToLatest = (chartInstance: any, totalBars: number) => {
+    if (!chartInstance || totalBars === 0) return;
+    const from = Math.max(0, totalBars - 120);
+    const to = Math.round(from + (totalBars - from) * 1.25);
+    chartInstance.timeScale().setVisibleLogicalRange({ from, to });
+  };
+
+  const handleScrollToLatest = () => {
+    if (chartRef.current && allCandlesRef.current.length > 0) {
+      setChartToLatest(chartRef.current, allCandlesRef.current.length);
+    }
   };
 
   const updateCurrentPrice = (price: number) => {
@@ -243,6 +257,7 @@ export const TVChartContainer = () => {
         borderColor: '#cbd5e1',
         timeVisible: true,
         secondsVisible: false,
+        rightOffset: 30,
       },
     });
 
@@ -482,7 +497,7 @@ export const TVChartContainer = () => {
           if (data.length > 0) {
             const sortedData = [...data].sort((a, b) => a.time - b.time);
             candleSeries.setData(sortedData as any);
-            chart.timeScale().fitContent();
+            setChartToLatest(chart, sortedData.length);
             allCandlesRef.current = sortedData;
             ichimokuDataRef.current = calculateIchimokuCloud(sortedData);
             if (ichimokuSeriesARef.current && ichimokuDataRef.current) {
@@ -522,7 +537,7 @@ export const TVChartContainer = () => {
           const candles = parseBinanceKlines(payload);
           if (candles.length > 0) {
             candleSeries.setData(candles as any);
-            chart.timeScale().fitContent();
+            setChartToLatest(chart, candles.length);
             allCandlesRef.current = candles;
             ichimokuDataRef.current = calculateIchimokuCloud(candles);
             if (ichimokuSeriesARef.current && ichimokuDataRef.current) {
@@ -620,7 +635,14 @@ export const TVChartContainer = () => {
     let hasMoreHistory = true;
 
     const handleVisibleRangeChange = async (newRange: any) => {
-      if (newRange === null || isFetchingHistory || !hasMoreHistory || isCancelled) return;
+      if (newRange === null || isCancelled) return;
+
+      // 우측 끝에서 벗어났는지 확인하여 처음가기 버튼 노출 제어
+      const totalBars = allCandlesRef.current.length;
+      const isPast = newRange.to < totalBars - 5;
+      setShowScrollToLatest((prev) => (prev !== isPast ? isPast : prev));
+
+      if (isFetchingHistory || !hasMoreHistory) return;
 
       // 사용자가 왼쪽 경계 근처로 스크롤한 경우 (보이는 캔들 인덱스 < 15)
       if (newRange.from < 15) {
@@ -971,6 +993,30 @@ export const TVChartContainer = () => {
         )}
 
         <div ref={chartContainerRef} className="w-full h-full" />
+
+        {/* 최근 시점으로 가기 플로팅 버튼 */}
+        {showScrollToLatest && (
+          <button
+            onClick={handleScrollToLatest}
+            className="absolute bottom-6 right-16 z-20 flex items-center justify-center w-8 h-8 rounded-full bg-white/90 backdrop-blur-xs border border-zinc-200 shadow-md text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50 hover:border-zinc-300 transition-all duration-200 hover:scale-105 active:scale-95 focus:outline-none"
+            title="최근 시점으로 이동"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth={2.5}
+              stroke="currentColor"
+              className="w-5 h-5"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M11.25 4.5l7.5 7.5-7.5 7.5m-6-15l7.5 7.5-7.5 7.5"
+              />
+            </svg>
+          </button>
+        )}
       </div>
 
       {/* Chart Footer Info */}
