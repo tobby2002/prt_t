@@ -1,4 +1,5 @@
 'use client';
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -150,13 +151,76 @@ const calculateIchimokuCloud = (data: ApiCandlestickData[]) => {
   return { spanA, spanB };
 };
 
+const calculateRsi = (data: ApiCandlestickData[], period: number = 14) => {
+  const rsiValues: { time: UTCTimestamp; value: number }[] = [];
+  if (data.length <= period) return rsiValues;
+
+  let gains = 0;
+  let losses = 0;
+
+  for (let i = 1; i <= period; i++) {
+    const difference = data[i].close - data[i - 1].close;
+    if (difference > 0) {
+      gains += difference;
+    } else {
+      losses -= difference;
+    }
+  }
+
+  let avgGain = gains / period;
+  let avgLoss = losses / period;
+
+  let rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
+  let rsi = avgLoss === 0 ? 100 : 100 - 100 / (1 + rs);
+
+  rsiValues.push({ time: data[period].time as UTCTimestamp, value: rsi });
+
+  for (let i = period + 1; i < data.length; i++) {
+    const difference = data[i].close - data[i - 1].close;
+    const gain = difference > 0 ? difference : 0;
+    const loss = difference < 0 ? -difference : 0;
+
+    avgGain = (avgGain * (period - 1) + gain) / period;
+    avgLoss = (avgLoss * (period - 1) + loss) / period;
+
+    rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
+    rsi = avgLoss === 0 ? 100 : 100 - 100 / (1 + rs);
+
+    rsiValues.push({ time: data[i].time as UTCTimestamp, value: rsi });
+  }
+
+  return rsiValues;
+};
+
+const calculateSma = (data: { time: UTCTimestamp; value: number }[], period: number = 14) => {
+  const smaValues: { time: UTCTimestamp; value: number }[] = [];
+  if (data.length < period) return smaValues;
+
+  let sum = 0;
+  for (let i = 0; i < period; i++) {
+    sum += data[i].value;
+  }
+  smaValues.push({ time: data[period - 1].time, value: sum / period });
+
+  for (let i = period; i < data.length; i++) {
+    sum = sum - data[i - period].value + data[i].value;
+    smaValues.push({ time: data[i].time, value: sum / period });
+  }
+  return smaValues;
+};
+
+
 export const TVChartContainer = () => {
   const chartContainerRef = useRef<HTMLDivElement>(null);
+  // RSI chart container and refs
+  const rsiChartContainerRef = useRef<HTMLDivElement>(null);
+  const rsiChartRef = useRef<any>(null);
   const candleSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
   const volumeSeriesRef = useRef<ISeriesApi<'Histogram'> | null>(null);
   const ichimokuSeriesARef = useRef<ISeriesApi<'Line'> | null>(null);
   const ichimokuSeriesBRef = useRef<ISeriesApi<'Line'> | null>(null);
   const chartRef = useRef<any | null>(null);
+  const [chartInstance, setChartInstance] = useState<any>(null);
   const lastVolumeDataRef = useRef<{ time: number; value: number }[] | null>(null);
   const allCandlesRef = useRef<ApiCandlestickData[]>([]);
   const ichimokuDataRef = useRef<{ spanA: { time: number; value: number }[]; spanB: { time: number; value: number }[] } | null>(null);
@@ -170,6 +234,25 @@ export const TVChartContainer = () => {
   const [error, setError] = useState<string | null>(null);
   const [showVolume, setShowVolume] = useState(true);
   const [showIchimoku, setShowIchimoku] = useState(false);
+  // RSI toggle and series (length 14)
+  const [showRSI, setShowRSI] = useState(false);
+  const rsiSeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
+  const rsiMaSeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
+  const rsiDataRef = useRef<{ time: number; value: number }[] | null>(null);
+
+  const updateRsiData = () => {
+    if (allCandlesRef.current.length === 0) return;
+    const rsiVals = calculateRsi(allCandlesRef.current);
+    const rsiMaVals = calculateSma(rsiVals);
+
+    if (rsiSeriesRef.current) {
+      rsiSeriesRef.current.setData(rsiVals);
+    }
+    if (rsiMaSeriesRef.current) {
+      rsiMaSeriesRef.current.setData(rsiMaVals);
+    }
+  };
+
   const [wsStatus, setWsStatus] = useState<'connecting' | 'connected' | 'disconnected'>('disconnected');
   const [currentPrice, setCurrentPrice] = useState<number | null>(null);
   const [priceChangeDir, setPriceChangeDir] = useState<'up' | 'down' | 'neutral'>('neutral');
@@ -271,6 +354,7 @@ export const TVChartContainer = () => {
 
     candleSeriesRef.current = candleSeries;
     chartRef.current = chart;
+    setChartInstance(chart);
     const resizeObserver = new ResizeObserver(() => {
       if (chartContainerRef.current) {
         const width = chartContainerRef.current.clientWidth;
@@ -350,6 +434,7 @@ export const TVChartContainer = () => {
             if (ichimokuSeriesBRef.current && ichimokuDataRef.current) {
               ichimokuSeriesBRef.current.setData(ichimokuDataRef.current.spanB as any);
             }
+            updateRsiData();
 
             if (volumeSeriesRef.current && candle.volume !== undefined) {
               const raw = candle.volume ?? 0;
@@ -448,6 +533,7 @@ export const TVChartContainer = () => {
               if (ichimokuSeriesBRef.current && ichimokuDataRef.current) {
                 ichimokuSeriesBRef.current.setData(ichimokuDataRef.current.spanB as any);
               }
+              updateRsiData();
 
               if (volumeSeriesRef.current && candle.volume !== undefined) {
                 const raw = candle.volume ?? 0;
@@ -566,6 +652,8 @@ export const TVChartContainer = () => {
           }
         }
 
+        updateRsiData();
+
         // Connect WS
         if (isCancelled) return;
         if (exchange === 'mexc') connectMexc();
@@ -579,20 +667,6 @@ export const TVChartContainer = () => {
           setLoading(false);
         }
       }
-    };
-
-    // Helper to create volume histogram series
-    const createVolumeSeries = () => {
-      if (!chartRef.current) return null;
-      const s = chartRef.current.addSeries(HistogramSeries, {
-        color: '#4c51bf',
-        priceFormat: { type: 'volume' },
-        priceScaleId: '',
-        scaleMargins: { top: 0.8, bottom: 0 },
-      });
-      volumeSeriesRef.current = s;
-      if (lastVolumeDataRef.current) s.setData(lastVolumeDataRef.current as any);
-      return s;
     };
 
     const createIchimokuSeries = () => {
@@ -622,11 +696,6 @@ export const TVChartContainer = () => {
     };
 
     loadData();
-
-    // create initial volume series if enabled
-    if (showVolume) {
-      createVolumeSeries();
-    }
     if (showIchimoku) {
       createIchimokuSeries();
     }
@@ -698,6 +767,7 @@ export const TVChartContainer = () => {
 
           // 일목구름 재계산
           ichimokuDataRef.current = calculateIchimokuCloud(combinedCandles);
+          updateRsiData();
 
           // 메인 캔들스틱 데이터 업데이트
           candleSeries.setData(combinedCandles as any);
@@ -755,6 +825,16 @@ export const TVChartContainer = () => {
           chartRef.current.removeSeries(volumeSeriesRef.current);
         } catch (_) {}
       }
+      if (rsiSeriesRef.current && chartRef.current) {
+        try {
+          chartRef.current.removeSeries(rsiSeriesRef.current);
+        } catch (_) {}
+      }
+      if (rsiMaSeriesRef.current && chartRef.current) {
+        try {
+          chartRef.current.removeSeries(rsiMaSeriesRef.current);
+        } catch (_) {}
+      }
       if (ichimokuSeriesARef.current && chartRef.current) {
         try {
           chartRef.current.removeSeries(ichimokuSeriesARef.current);
@@ -765,34 +845,113 @@ export const TVChartContainer = () => {
           chartRef.current.removeSeries(ichimokuSeriesBRef.current);
         } catch (_) {}
       }
+      setChartInstance(null);
       chart.remove();
     };
   }, [exchange, symbol, interval]);
 
-  // watch showVolume and add/remove series without recreating chart
+  // watch showVolume and showRSI to add/remove/recreate series and manage multi-pane layout
   useEffect(() => {
     const chart = chartRef.current;
     if (!chart) return;
-    if (showVolume) {
-      if (!volumeSeriesRef.current) {
-        const s = chart.addSeries(HistogramSeries, {
-          color: '#4c51bf',
-          priceFormat: { type: 'volume' },
-          priceScaleId: '',
-          scaleMargins: { top: 0.8, bottom: 0 },
-        });
-        volumeSeriesRef.current = s;
-        if (lastVolumeDataRef.current) s.setData(lastVolumeDataRef.current as any);
-      }
-    } else {
-      if (volumeSeriesRef.current) {
-        try {
-          chart.removeSeries(volumeSeriesRef.current);
-        } catch (_) {}
-        volumeSeriesRef.current = null;
-      }
+
+    // Always clean up existing series first to prevent any moveToPane null errors or incorrect order
+    if (volumeSeriesRef.current) {
+      try {
+        chart.removeSeries(volumeSeriesRef.current);
+      } catch (_) {}
+      volumeSeriesRef.current = null;
     }
-  }, [showVolume]);
+    if (rsiSeriesRef.current) {
+      try {
+        chart.removeSeries(rsiSeriesRef.current);
+      } catch (_) {}
+      rsiSeriesRef.current = null;
+    }
+    if (rsiMaSeriesRef.current) {
+      try {
+        chart.removeSeries(rsiMaSeriesRef.current);
+      } catch (_) {}
+      rsiMaSeriesRef.current = null;
+    }
+
+    // Determine pane indices dynamically
+    let currentPaneIdx = 1;
+    const volPaneIdx = showVolume ? currentPaneIdx++ : -1;
+    const rsiPaneIdx = showRSI ? currentPaneIdx++ : -1;
+
+    // 1. Create Volume Series if enabled
+    if (showVolume) {
+      const s = chart.addSeries(HistogramSeries, {
+        color: 'rgba(76, 81, 191, 0.7)',
+        priceFormat: { type: 'volume' },
+      }, volPaneIdx);
+      volumeSeriesRef.current = s;
+      if (lastVolumeDataRef.current) s.setData(lastVolumeDataRef.current as any);
+    }
+
+    // 2. Create RSI Series if enabled
+    if (showRSI) {
+      const rsiSeries = chart.addSeries(LineSeries, {
+        color: '#7E57C2',
+        lineWidth: 2,
+        title: 'RSI',
+      }, rsiPaneIdx);
+
+      rsiSeries.createPriceLine({
+        price: 70,
+        color: '#787B86',
+        lineWidth: 1,
+        lineStyle: 1, // Dashed
+        axisLabelVisible: true,
+      });
+      rsiSeries.createPriceLine({
+        price: 50,
+        color: 'rgba(120, 123, 134, 0.4)',
+        lineWidth: 1,
+        lineStyle: 1, // Dashed
+        axisLabelVisible: true,
+      });
+      rsiSeries.createPriceLine({
+        price: 30,
+        color: '#787B86',
+        lineWidth: 1,
+        lineStyle: 1, // Dashed
+        axisLabelVisible: true,
+      });
+
+      const rsiMaSeries = chart.addSeries(LineSeries, {
+        color: '#E9D5FF',
+        lineWidth: 1.5,
+        title: 'RSI-based MA',
+      }, rsiPaneIdx);
+
+      rsiSeriesRef.current = rsiSeries;
+      rsiMaSeriesRef.current = rsiMaSeries;
+      updateRsiData();
+    }
+
+    // 3. Adjust stretch factors for the panes
+    setTimeout(() => {
+      try {
+        const panes = chart.panes();
+        if (panes && panes.length > 0) {
+          // Main price pane gets the most height
+          panes[0].setStretchFactor(4);
+          let currentIdx = 1;
+          if (showVolume && panes.length > currentIdx) {
+            panes[currentIdx++].setStretchFactor(1.2);
+          }
+          if (showRSI && panes.length > currentIdx) {
+            panes[currentIdx++].setStretchFactor(1.5);
+          }
+        }
+      } catch (e) {
+        console.warn("Failed to set stretch factors", e);
+      }
+    }, 50);
+
+  }, [chartInstance, showVolume, showRSI]);
 
   useEffect(() => {
     const chart = chartRef.current;
@@ -833,7 +992,7 @@ export const TVChartContainer = () => {
         ichimokuSeriesBRef.current = null;
       }
     }
-  }, [showIchimoku]);
+  }, [chartInstance, showIchimoku]);
 
   const quickSymbols = exchange === 'mexc'
     ? ['BTCUSDT.P', 'ETHUSDT.P', 'SOLUSDT.P', 'XRPUSDT.P']
@@ -896,6 +1055,15 @@ export const TVChartContainer = () => {
               }`}
           >
             일목 구름
+          </button>
+          <button
+            onClick={() => setShowRSI((s) => !s)}
+            className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all duration-200 ${showRSI
+                ? 'bg-white text-zinc-900 shadow-sm'
+                : 'text-zinc-600 hover:text-zinc-900'
+              }`}
+          >
+            RSI
           </button>
 
           {/* Connection status badge */}

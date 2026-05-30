@@ -1,0 +1,200 @@
+// This work is licensed under a Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0) https://creativecommons.org/licenses/by-nc-sa/4.0/
+// © aibitcointrend
+
+//@version=6
+indicator("Adaptive RSI with Real-Time Divergence [neo]", overlay=false, max_lines_count = 500, max_polylines_count = 100, precision = 1)
+
+rsiLength           = input.int(14, minval=1, title="RSI Length", group="Adaptive RSI (Gaussian Weighted)")
+sigma               = input.float(3.0, minval=0.01, title="Gaussian Sigma", group="Adaptive RSI (Gaussian Weighted)")
+enableMA            = input.bool(true, title="Signal Line", group="Signal Line")
+signallength        = input.int(9, minval=1, title="Signal Length", group="Signal Line")
+calculateDivergence = input.bool(false, title="Real-Time Divergence", group="Real-Time Divergence")
+lookbackLeft  = input.int(20, minval=1, title="Lookback", group="Real-Time Divergence")
+bearColor  = input.color(color.red,   "Bearish Color", group="Real-Time Divergence")
+bullColor  = input.color(color.green, "Bullish Color", group="Real-Time Divergence")
+textColor  = input.color(color.white, "Text Color", group="Real-Time Divergence")
+noneColor  = color.new(color.white, 100)
+
+float weightedGain = 0.0
+float weightedLoss = 0.0
+float totalWeight = 0.0
+
+for i = 1 to rsiLength
+    weight = math.exp(-math.pow(i - (rsiLength/2), 2) / (2 * math.pow(sigma, 2)))
+    totalWeight += weight
+    delta = close[i - 1] - close[i]  
+    gain = delta > 0 ? delta : 0.0
+    loss = delta < 0 ? -delta : 0.0
+    weightedGain += gain * weight
+    weightedLoss += loss * weight
+
+avgGain = weightedGain / totalWeight
+avgLoss = weightedLoss / totalWeight
+
+rs = avgLoss == 0 ? 0 : avgGain / avgLoss
+rsiAdaptive  = avgLoss == 0 ? 100 : 100 - (100 / (1 + rs))
+smoothingRSI = ta.sma(rsiAdaptive, signallength)
+
+rsiPlot = plot(rsiAdaptive, "Adaptive RSI", color=color.blue)
+plot(smoothingRSI, "RSI-based MA", color=color.yellow, display = enableMA ? display.all : display.none, editable = enableMA)
+rsiUpperBand = hline(70, "Overbought", color=color.red)
+rsiLowerBand = hline(30, "Oversold", color=color.green)
+midLinePlot = plot(50, color = chart.fg_color)
+
+fill(rsiUpperBand, rsiLowerBand, color=color.rgb(126, 87, 194, 90), title="RSI Background Fill")
+fill(rsiPlot, midLinePlot, 100, 60, top_color = color.new(color.green, 0), bottom_color = color.new(color.green, 100),  title = "Overbought Gradient Fill")
+fill(rsiPlot, midLinePlot, 40,  0,  top_color = color.new(color.red, 100), bottom_color = color.new(color.red, 0),      title = "Oversold Gradient Fill")
+
+p1 = plot(rsiAdaptive, color = color.blue, display = display.none, editable = false)
+p2 = plot(rsiAdaptive[4], display = display.none, editable = false)
+fill(p1, p2, rsiAdaptive, rsiAdaptive[4], color.blue, na)
+
+// Divergence 
+var bool plFound = false
+var bool phFound = false
+var bool bullCond = false
+var bool bearCond = false
+
+if calculateDivergence
+    plFound := not na(ta.pivotlow(rsiAdaptive, lookbackLeft, 0))
+    rsiHL = rsiAdaptive > ta.valuewhen(plFound, rsiAdaptive, 1) 
+    priceLL = low < ta.valuewhen(plFound, low, 1)
+    bullCond := priceLL and rsiHL and plFound
+    phFound := not na(ta.pivothigh(rsiAdaptive, lookbackLeft, 0))
+    rsiLH = rsiAdaptive < ta.valuewhen(phFound, rsiAdaptive, 1)
+    priceHH = high > ta.valuewhen(phFound, high, 1)
+    bearCond := priceHH and rsiLH and phFound
+
+plot(plFound ? rsiAdaptive : na, title="Bullish Pivot", linewidth=2, color=(bullCond ? bullColor : noneColor))
+plotshape(bullCond ? rsiAdaptive : na, title="Bullish Divergence Label", text=" Bull ", style=shape.labelup, location=location.absolute, color=bullColor, textcolor=textColor)
+plot(phFound ? rsiAdaptive : na, title="Bearish Pivot", linewidth=2, color=(bearCond ? bearColor : noneColor))
+plotshape(bearCond ? rsiAdaptive : na, title="Bearish Divergence Label", text=" Bear ", style=shape.labeldown, location=location.absolute, color=bearColor, textcolor=textColor)
+
+alertcondition(bullCond, title="Real-time Bullish Divergence", message="New Real-time Bullish Divergence detected.")
+alertcondition(bearCond, title="Real-time Bearish Divergence", message="New Real-time Bearish Divergence detected.")
+
+// Trailing Stop
+// Crossover Trailing Stop
+sig   = input.bool(true, title="Crosses Signals", group="Bullish/Bearish Signals", inline="")
+butri = input.int(20, minval=1, maxval=99, title="Trigger Bull when ta.crossover(rsi,value)", group="Bullish/Bearish Signals", inline="")
+betri = input.int(80, minval=1, maxval=99, title="Trigger Bear when ta.crossunder(rsi,value)", group="Bullish/Bearish Signals", inline="")
+
+trEn = input.bool(true, title='Crosses Trailing Stop', group="Trailing Stop", tooltip='Enable or disable the breakout trailing stop feature. When enabled, trailing stops are calculated based on ATR.')
+m = input.float(3, minval=0.1, step=0.1, title='Trailing Multiplier', group="Trailing Stop", tooltip='ATR multiplier for calculating the trailing stop. Higher values result in wider stops, reducing the chance of premature exit.')
+lw = input.int(1, minval=1, title='Trailing Line Width', group="Trailing Stop", tooltip='Width of the trailing stop line displayed on the chart.')
+posClr = input.color(color.rgb(119, 255, 0), title='', group='Trailing Stop', inline='Style')
+negClr = input.color(color.rgb(255, 0, 13), title='', group='Trailing Stop', inline='Style')
+atr = ta.atr(100)
+
+// Functions for Trailing Stop Updates 
+f_updateBull(bullTrig, bullAct, preStop, ts, pts, cross, col, lw) =>
+    var float newTS = ts
+    var bool newActive = bullAct
+    var bool actPlot = false
+    if bullTrig or bullAct
+        if bullTrig
+            // New trigger: add starting point and set stop value.
+            array.unshift(pts, chart.point.from_index(bar_index, preStop))
+            newTS := preStop
+            newActive := true
+        else
+            // Update stop: use the maximum of the new preStop or the current stop.
+            array.unshift(pts, chart.point.from_index(bar_index, math.max(preStop, newTS)))
+            newTS := math.max(preStop, newTS)
+            actPlot := true
+        // Exit condition: if the price crosses below the stop, reset state.
+        if cross
+            newActive := false
+            newTS := float(na)
+            polyline.new(pts, line_color = col, line_width = lw, force_overlay = true)
+            array.clear(pts)
+    [newTS, newActive, actPlot]
+
+// f_updateBear: Updates bearish trailing stop state.
+f_updateBear(bearTrig, bearAct, preStop, ts, pts, cross, col, lw) =>
+    var float newTS = ts
+    var bool newActive = bearAct
+    var bool actPlot = false
+    if bearTrig or bearAct
+        if bearTrig
+            // New trigger: add starting point and set stop value.
+            array.unshift(pts, chart.point.from_index(bar_index, preStop))
+            newTS := preStop
+            newActive := true
+        else
+            // Update stop: use the minimum of the new preStop or the current stop.
+            array.unshift(pts, chart.point.from_index(bar_index, math.min(preStop, newTS)))
+            newTS := math.min(preStop, newTS)
+            actPlot := true
+        // Exit condition: if the price crosses above the stop, reset state.
+        if cross
+            newActive := false
+            newTS := float(na)
+            polyline.new(pts, line_color = col, line_width = lw, force_overlay = true)
+            array.clear(pts)
+    [newTS, newActive, actPlot]
+
+// Global Variables and Pre-Calculations
+// Initialize arrays and state variables for bullish and bearish trailing stops.
+var ptsBull = array.new<chart.point>()    
+var ptsBear = array.new<chart.point>()    
+var polyline pBull = na                   
+var polyline pBear = na                   
+var bullPos = false                       
+var bearPos = false                      
+var tsBull = float(na)                    
+var tsBear = float(na)                    
+
+bool bullAct = false
+bool bearAct = false                    
+
+// Label Customization: colors and label size.
+color bLblClr = color.new(color.green, 0) 
+color rLblClr = color.new(color.red, 0)   
+lblSz = size.normal                     
+
+// Calculate RSI-based crossover conditions for signal generation.
+bool isB = ta.crossover(rsiAdaptive, butri)  
+bool isBr = ta.crossunder(rsiAdaptive, betri) 
+
+// Pre-calculate initial stop levels using ATR and multiplier.
+float preBullStop = low - atr * m      
+float preBearStop = high + atr * m          
+
+// Determine if the price has crossed the trailing stop levels.
+bool crossBull = ta.crossunder(low, tsBull) 
+bool crossBear = ta.crossover(high, tsBear)  
+
+// Define trailing stop triggers based on RSI conditions and trailing stop enable flag.
+bool bullT = isB and not isB[1] and trEn    
+bool bearT = isBr and not isBr[1] and trEn   
+
+// Main Execution Using the Functions 
+// Bullish Trailing Stop Update.
+[newTSBull, newBullPos, newBullAct] = f_updateBull(bullT, bullPos, preBullStop, tsBull, ptsBull, crossBull, posClr, lw)
+tsBull := newTSBull      
+bullPos := newBullPos     
+bullAct := newBullAct     
+pBull.delete()          
+if ptsBull.size() > 0
+    pBull := polyline.new(ptsBull, false, false, line_color = posClr, line_width = lw, force_overlay = true)
+
+// Bearish Trailing Stop Update.
+[newTSBear, newBearPos, newBearAct] = f_updateBear(bearT, bearPos, preBearStop, tsBear, ptsBear, crossBear, negClr, lw)
+tsBear := newTSBear       
+bearPos := newBearPos    
+bearAct := newBearAct     
+pBear.delete()           
+if ptsBear.size() > 0
+    pBear := polyline.new(ptsBear, false, false, line_color = negClr, line_width = lw, force_overlay = true)
+
+// Plotshape
+plotshape(bullT and sig ? low - atr * m : na, location = location.absolute, style = shape.circle, color = posClr, size = size.tiny, title = 'Bullish Trailing Starts', force_overlay = true)
+plotshape(bullT and newBullPos[1] == false  and sig? low - atr * m : na, location = location.absolute, style = shape.circle, color = color.new(posClr, 50), size = size.small, title = 'Bullish Trailing Starts', force_overlay = true)
+plotshape(bearT and sig? high + atr * m : na, location = location.absolute, style = shape.circle, color = negClr, size = size.tiny, title = 'Bearish Trailing Starts', force_overlay = true)
+plotshape(bearT and newBearPos[1] == false and sig? high + atr * m : na, location = location.absolute, style = shape.circle, color = color.new(negClr, 50), size = size.small, title = 'Bearish Trailing Starts', force_overlay = true)
+
+plotshape(bullT and sig? rsiAdaptive : na, location = location.absolute, style = shape.circle, color = posClr, size = size.tiny, title = 'Bullish Trailing Starts')
+plotshape(bullT and newBullPos[1] == false and sig? rsiAdaptive : na, location = location.absolute, style = shape.circle, color = color.new(posClr, 50), size = size.small, title = 'Bullish Trailing Starts')
+plotshape(bearT and sig? rsiAdaptive : na, location = location.absolute, style = shape.circle, color = negClr, size = size.tiny, title = 'Bearish Trailing Starts')
+plotshape(bearT and newBearPos[1] == false and sig? rsiAdaptive : na, location = location.absolute, style = shape.circle, color = color.new(negClr, 50), size = size.small, title = 'Bearish Trailing Starts')

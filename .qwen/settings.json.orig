@@ -1,0 +1,56 @@
+{
+  "permissions": {
+    "allow": [
+      "Skill(qc-helper)",
+      "Read(//Users/master/.vscode/extensions/qwenlm.qwen-code-vscode-ide-companion-0.16.0-darwin-x64/dist/qwen-cli/bundled/qc-helper/docs/configuration/**)",
+      "Read(//Users/master/workspace/​prt_t/frontend/src/components/TVChartContainer/**)",
+      "Bash(npm run *)",
+      "Bash(python *)",
+      "Bash(kill *)"
+    ]
+  },
+  "modelProviders": {
+    "openai": [
+      {
+        "id": "qwen3-coder-plus",
+        "name": "qwen3-coder-plus",
+        "baseUrl": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+        "description": "Qwen3 Coder Plus via Alibaba Cloud ModelStudio (Singapore)",
+        "envKey": "DASHSCOPE_API_KEY"
+      },
+      {
+        "id": "qwen3-coder-next",
+        "name": "qwen3-coder-next",
+        "baseUrl": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+        "description": "Qwen3 Coder Next via Alibaba Cloud ModelStudio (Singapore)",
+        "envKey": "DASHSCOPE_API_KEY"
+      },
+      {
+        "id": "qwen3-max",
+        "name": "qwen3-max",
+        "baseUrl": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+        "description": "Qwen3 Max via Alibaba Cloud ModelStudio (Singapore)",
+        "envKey": "DASHSCOPE_API_KEY"
+      },
+      {
+        "id": "qwen-max",
+        "name": "qwen-max",
+        "baseUrl": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+        "description": "Qwen Max Latest via Alibaba Cloud ModelStudio (Singapore)",
+        "envKey": "DASHSCOPE_API_KEY"
+      }
+    ]
+  },
+  "env": {
+    "DASHSCOPE_API_KEY": "sk-ws-H.HLXIRM.TTFO.MEYCIQDt0Nri91Y3Igg5-3kJPOUOphuYdPhHxy2w7KM50xHlGwIhAMJkjOeLKc4MGqwaOQHFagnBFSFFBKS0a_lejfR5qTIS"
+  },
+  "security": {
+    "auth": {
+      "selectedType": "openai"
+    }
+  },
+  "model": {
+    "name": "qwen-max"
+  },
+  "$version": 4
+}
