@@ -224,6 +224,7 @@ export const TVChartContainer = () => {
   const lastVolumeDataRef = useRef<{ time: number; value: number }[] | null>(null);
   const allCandlesRef = useRef<ApiCandlestickData[]>([]);
   const ichimokuDataRef = useRef<{ spanA: { time: number; value: number }[]; spanB: { time: number; value: number }[] } | null>(null);
+  const savedLogicalRangeRef = useRef<any>(null);
 
   const [exchange, setExchange] = useState<'binance' | 'mexc'>('mexc');
   const [symbol, setSymbol] = useState('BTCUSDT.P');
@@ -290,6 +291,44 @@ export const TVChartContainer = () => {
     const from = Math.max(0, totalBars - 120);
     const to = Math.round(from + (totalBars - from) * 1.25);
     chartInstance.timeScale().setVisibleLogicalRange({ from, to });
+  };
+
+  const restoreChartRange = (chartInstance: any, totalBars: number) => {
+    if (!chartInstance || totalBars === 0) return;
+    const saved = savedLogicalRangeRef.current;
+    if (saved && typeof saved.zoom === 'number') {
+      const zoom = saved.zoom;
+      
+      // Try to find the closest candle by timestamp
+      if (saved.centerTime && allCandlesRef.current.length > 0) {
+        const targetTime = saved.centerTime;
+        let closestIdx = 0;
+        let minDiff = Infinity;
+        
+        for (let i = 0; i < allCandlesRef.current.length; i++) {
+          const diff = Math.abs(allCandlesRef.current[i].time - targetTime);
+          if (diff < minDiff) {
+            minDiff = diff;
+            closestIdx = i;
+          }
+        }
+        
+        const from = closestIdx - Math.floor(zoom / 2);
+        const to = from + zoom;
+        chartInstance.timeScale().setVisibleLogicalRange({ from, to });
+        return;
+      }
+      
+      // Fallback to right offset
+      if (typeof saved.rightOffset === 'number') {
+        const to = totalBars - saved.rightOffset;
+        const from = to - zoom;
+        chartInstance.timeScale().setVisibleLogicalRange({ from, to });
+        return;
+      }
+    }
+    
+    setChartToLatest(chartInstance, totalBars);
   };
 
   const handleScrollToLatest = () => {
@@ -583,8 +622,8 @@ export const TVChartContainer = () => {
           if (data.length > 0) {
             const sortedData = [...data].sort((a, b) => a.time - b.time);
             candleSeries.setData(sortedData as any);
-            setChartToLatest(chart, sortedData.length);
             allCandlesRef.current = sortedData;
+            restoreChartRange(chart, sortedData.length);
             ichimokuDataRef.current = calculateIchimokuCloud(sortedData);
             if (ichimokuSeriesARef.current && ichimokuDataRef.current) {
               ichimokuSeriesARef.current.setData(ichimokuDataRef.current.spanA as any);
@@ -623,8 +662,8 @@ export const TVChartContainer = () => {
           const candles = parseBinanceKlines(payload);
           if (candles.length > 0) {
             candleSeries.setData(candles as any);
-            setChartToLatest(chart, candles.length);
             allCandlesRef.current = candles;
+            restoreChartRange(chart, candles.length);
             ichimokuDataRef.current = calculateIchimokuCloud(candles);
             if (ichimokuSeriesARef.current && ichimokuDataRef.current) {
               ichimokuSeriesARef.current.setData(ichimokuDataRef.current.spanA as any);
@@ -706,8 +745,20 @@ export const TVChartContainer = () => {
     const handleVisibleRangeChange = async (newRange: any) => {
       if (newRange === null || isCancelled) return;
 
-      // 우측 끝에서 벗어났는지 확인하여 처음가기 버튼 노출 제어
       const totalBars = allCandlesRef.current.length;
+      if (totalBars > 0) {
+        const centerLogicalIdx = Math.floor((newRange.from + newRange.to) / 2);
+        const clampedIndex = Math.max(0, Math.min(totalBars - 1, centerLogicalIdx));
+        const centerTime = allCandlesRef.current[clampedIndex]?.time;
+
+        savedLogicalRangeRef.current = {
+          zoom: newRange.to - newRange.from,
+          centerTime: centerTime,
+          rightOffset: totalBars - newRange.to,
+        };
+      }
+
+      // 우측 끝에서 벗어났는지 확인하여 처음가기 버튼 노출 제어
       const isPast = newRange.to < totalBars - 5;
       setShowScrollToLatest((prev) => (prev !== isPast ? isPast : prev));
 
