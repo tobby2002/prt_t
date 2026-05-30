@@ -88,6 +88,7 @@ class BacktestRunResult:
     won_trades: int
     equity_curve: list[dict[str, Any]] = field(default_factory=list)
     trades: list[dict[str, Any]] = field(default_factory=list)
+    ohlcv: list[dict[str, Any]] = field(default_factory=list)
 
 # 안전하게 float 변환 함수
 def _safe_float(x: Any) -> float | None:
@@ -143,6 +144,18 @@ def run_sma_cross_backtest(
 
     trades = list(strat.closed_trades)
 
+    ohlcv = [
+        {
+            "time": d.date().isoformat(),
+            "open": float(row["Open"]),
+            "high": float(row["High"]),
+            "low": float(row["Low"]),
+            "close": float(row["Close"]),
+            "volume": float(row["Volume"]),
+        }
+        for d, row in df.iterrows()
+    ]
+
     return BacktestRunResult(
         initial_cash=cash,
         final_value=round(final_value, 2),
@@ -154,4 +167,5 @@ def run_sma_cross_backtest(
         won_trades=won,
         equity_curve=equity_curve,
         trades=trades,
+        ohlcv=ohlcv,
     )

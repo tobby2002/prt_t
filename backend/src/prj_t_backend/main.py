@@ -153,6 +153,7 @@ def create_app() -> FastAPI:
             },
             "equity_curve": result.equity_curve,
             "trades": result.trades,
+            "ohlcv": result.ohlcv,
         }
         _store[rid] = payload
         return RunBacktestResponse(id=rid, summary=payload["summary"])

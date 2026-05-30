@@ -20,6 +20,12 @@ const TVChartContainer = dynamic(
   { ssr: false }
 );
 
+const BacktestChart = dynamic(
+  () =>
+    import("@/components/BacktestChart").then((mod) => mod.BacktestChart),
+  { ssr: false }
+);
+
 const defaultForm = {
   fast: 10,
   slow: 30,
@@ -307,6 +313,38 @@ export default function Home() {
                   <Line type="monotone" dataKey="value" stroke="#18181b" strokeWidth={2} dot={false} />
                 </LineChart>
               </ResponsiveContainer>
+            </div>
+          </section>
+        )}
+
+        {detail && detail.ohlcv && detail.ohlcv.length > 0 && (
+          <section className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-semibold">전략 실행 차트 (체결 내역 표시)</h2>
+              <div className="relative flex items-center group cursor-help">
+                <svg
+                  className="h-4 w-4 text-zinc-400 transition-colors group-hover:text-zinc-600"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+                <div className="absolute left-1/2 bottom-full mb-2 hidden w-64 -translate-x-1/2 flex-col items-center group-hover:flex z-50">
+                  <div className="rounded-lg bg-zinc-800 px-3 py-2 text-xs leading-relaxed text-white shadow-lg text-center font-normal">
+                    백테스트 데이터를 기반으로 한 캔들차트 및 매수(BUY)/매도(SELL) 체결 지점을 화살표로 보여주는 차트입니다.
+                  </div>
+                  <div className="-mt-1 h-2 w-2 rotate-45 bg-zinc-800"></div>
+                </div>
+              </div>
+            </div>
+            <div className="mt-4">
+              <BacktestChart ohlcv={detail.ohlcv} trades={detail.trades} />
             </div>
           </section>
         )}

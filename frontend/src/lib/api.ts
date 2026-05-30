@@ -34,6 +34,14 @@ export type BacktestDetail = {
   summary: BacktestSummary;
   equity_curve: EquityPoint[];
   trades: TradeRow[];
+  ohlcv: {
+    time: string;
+    open: number;
+    high: number;
+    low: number;
+    close: number;
+    volume: number;
+  }[];
 };
 
 export async function runBacktest(body: {
